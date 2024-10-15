@@ -1,0 +1,15 @@
+[project]
+name = "cloud"
+version = "0.1.0"
+description = "The part of audio-publisher that runs in the cloud"
+readme = "../README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-cloud-storage>=2.18.2",
+    "jinja2>=3.1.4",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "flask>=3.0.3",
+]

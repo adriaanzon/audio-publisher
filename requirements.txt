@@ -1,4 +1,0 @@
-# TODO: Use uv workspaces instead of a requirements.txt file per 'workspace'
--r cloud/requirements.txt
--r raspberry_pi/requirements.txt
-flask
