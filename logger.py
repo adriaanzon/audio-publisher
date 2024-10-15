@@ -1,3 +1,4 @@
+# This file might not be needed, might log differently when using cloud functions
 from abc import ABC, abstractmethod
 
 

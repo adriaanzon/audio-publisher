@@ -3,18 +3,17 @@ import subprocess
 from pathlib import Path
 
 import pyudev
+from google.cloud import storage
 
-from flash_drive_reader import X32FlashDriveReader
 from logger import ConsoleLogger
-from raspberrypi.normalize import normalize
-from raspberrypi.publisher import EmailPublisher
-from storage import S3Storage
+from raspberry_pi.flash_drive_reader import X32FlashDriveReader
+
+# Watches raspberry pi USB ports for newly attached flash drives and uploads the latest recording to cloud bucket
+
 
 flash_drive_reader = X32FlashDriveReader()
-storage = S3Storage()
-publisher = EmailPublisher()
 logger = ConsoleLogger()
-var_path = os.path.dirname(os.path.realpath(__file__)) + '/../var'
+var_path = os.path.dirname(os.path.realpath(__file__)) + '/var'
 
 
 def watch():
@@ -30,31 +29,27 @@ def watch():
 
             recording = flash_drive_reader.get_latest_recording(Path(mount_point))
 
-            if recording and not has_been_processed(recording):
-                process_recording(recording)
-                mark_as_processed(recording)
+            if recording and not has_been_uploaded(recording):
+                upload_recording(recording)
+                mark_as_uploaded(recording)
 
             subprocess.run(["umount", mount_point])
 
 
-def process_recording(recording: Path):
-    normalized_recording = normalize(recording)
-    stored_file = storage.store(normalized_recording)
-
-    if not storage.publishes():
-        publisher.publish(stored_file)
+def upload_recording(recording: Path):
+    client = storage.Client().from_service_account_json() # TODO
 
 
-def has_been_processed(path):
-    with open(var_path + "/processed_recordings", "r") as file:
+def has_been_uploaded(path):
+    with open(var_path + "/uploaded_recordings", "r") as file:
         return path.name + "\n" in file.readlines()
 
 
-def mark_as_processed(path):
-    with open(var_path + "/processed_recordings", "a") as file:
+def mark_as_uploaded(path):
+    with open(var_path + "/uploaded_recordings", "a") as file:
         file.write(path.name + "\n")
 
-    logger.info(path.name + " has been processed.")
+    logger.info(path.name + " has been uploaded.")
 
 
 if __name__ == "__main__":
@@ -62,6 +57,6 @@ if __name__ == "__main__":
         exit("In order to mount the USB drive, root priviliges are required. Try running the command using sudo.")
 
     Path(var_path).mkdir(parents=True, exist_ok=True)
-    Path(var_path + "/processed_recordings").touch(exist_ok=True)
+    Path(var_path + "/uploaded_recordings").touch(exist_ok=True)
 
     watch()

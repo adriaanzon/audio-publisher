@@ -18,3 +18,4 @@ class X32FlashDriveReader(FlashDriveReader):
         #  In this case, the system administrator must be warned to recover the recording.
 
         return latest_recording
+
