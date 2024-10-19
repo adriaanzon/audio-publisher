@@ -3,8 +3,11 @@ use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest, Up
 use std::io::BufRead;
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
+
+// TODO: don't use unwrap, but return a Result so the caller has a chance to unmount the drive
 
 /// Upload the given files to the Google Cloud bucket
 pub async fn upload_files(file_paths: Vec<PathBuf>) {
@@ -69,7 +72,12 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
             .iter()
             .filter_map(|entry| {
                 let metadata = entry.metadata().unwrap();
-                let created = metadata.created().unwrap().elapsed().unwrap().as_secs();
+                let created = metadata
+                    .created()
+                    .unwrap()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
                 if created > timestamp {
                     Some(entry.clone())
                 } else {
@@ -86,7 +94,7 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
                     .unwrap()
                     .created()
                     .unwrap()
-                    .elapsed()
+                    .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
                     .as_secs()
             }) {
@@ -107,7 +115,7 @@ pub fn mark_as_uploaded(new_recordings: Vec<PathBuf>) {
                 .unwrap()
                 .created()
                 .unwrap()
-                .elapsed()
+                .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs()
         })

@@ -47,11 +47,14 @@ where
                     }
                 }
 
+                let source = event.devnode().unwrap();
+                println!("Attempting to mount device at {:?} to {:?}", source, mount_point);
+
                 // Mount
                 match mount(
-                    Some(event.devpath()),
+                    Some(source),
                     mount_point.as_str(),
-                    None::<&str>,
+                    Some("vfat"), // todo: detect file system type
                     MsFlags::MS_RDONLY,
                     None::<&str>,
                 ) {
@@ -64,7 +67,7 @@ where
 
                 // No use of `continue` from here, must always unmount
 
-                println!("Mounted {:?} at {}", event.devpath(), mount_point);
+                println!("Mounted");
 
                 match closure(&mount_point).await {
                     Ok(_) => {}
@@ -73,6 +76,7 @@ where
 
                 // Unmount
                 let _ = umount(mount_point.as_str());
+                println!("Unmounted");
             }
         }
     }
