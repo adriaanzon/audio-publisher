@@ -1,10 +1,11 @@
-use nix::mount::{mount, unmount, MntFlags};
+use nix::mount::{mount, umount, MsFlags};
 
-pub fn watch<F>(closure: F)
+pub async fn watch<F, Fut>(closure: F)
 where
-    F: Fn(&str),
+    F: Fn(&str) -> Fut,
+    Fut: std::future::Future<Output = Result<(), Box<dyn std::error::Error>>>,
 {
-    let mut monitor = udev::MonitorBuilder::new()
+    let monitor = udev::MonitorBuilder::new()
         .unwrap()
         .match_subsystem("block")
         .unwrap()
@@ -16,17 +17,17 @@ where
             None => {}
             Some(event) => {
                 let action = match event.action() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        eprintln!("Error getting action: {}", e);
+                    Some(a) => a,
+                    None => {
+                        eprintln!("Error getting action");
                         continue;
                     }
                 };
 
                 let devtype = match event.devtype() {
-                    Ok(dt) => dt,
-                    Err(e) => {
-                        eprintln!("Error getting devtype: {}", e);
+                    Some(dt) => dt,
+                    None => {
+                        eprintln!("Error getting devtype");
                         continue;
                     }
                 };
@@ -35,7 +36,7 @@ where
                     continue;
                 }
 
-                let mount_point = format!("/mnt/{}", event.sysname());
+                let mount_point = format!("/mnt/{}", event.sysname().to_str().unwrap());
 
                 // Make directory
                 match std::fs::create_dir_all(&mount_point) {
@@ -48,10 +49,11 @@ where
 
                 // Mount
                 match mount(
-                    event.devpath(),
+                    Some(event.devpath()),
                     mount_point.as_str(),
-                    MntFlags::MNT_RDONLY,
-                    None,
+                    None::<&str>,
+                    MsFlags::MS_RDONLY,
+                    None::<&str>,
                 ) {
                     Ok(_) => {}
                     Err(e) => {
@@ -62,14 +64,15 @@ where
 
                 // No use of `continue` from here, must always unmount
 
-                println!("Mounted {} at {}", event.devpath(), mount_point);
+                println!("Mounted {:?} at {}", event.devpath(), mount_point);
 
-                if let Err(e) = closure(&mount_point) {
-                    eprintln!("Error while executing the watch handler: {}", e);
+                match closure(&mount_point).await {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("Error while executing the watch handler: {}", e),
                 }
 
                 // Unmount
-                let _ = unmount(mount_point.as_str(), MntFlags::empty());
+                let _ = umount(mount_point.as_str());
             }
         }
     }

@@ -7,3 +7,14 @@ edition = "2021"
 google-cloud-storage = "0.22.1"
 nix = { version = "0.29.0", features = ["user", "mount"] }
 udev = "0.9.0"
+tokio = { version = "1.40.0", features = ["rt-multi-thread"] }
+tokio-util = "0.7.12"
+
+[build]
+target = "aarch64-unknown-linux-gnu"
+
+[workspace.metadata.cross.target.aarch64-unknown-linux-gnu]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH libudev-dev:$CROSS_DEB_ARCH"
+]

@@ -1,43 +1,46 @@
 use google_cloud_storage::client::{Client, ClientConfig};
 use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest, UploadType};
 use std::io::BufRead;
-use std::path::Path;
+use std::io::Write;
+use std::path::PathBuf;
+use tokio::fs::File;
+use tokio_util::io::ReaderStream;
 
 /// Upload the given files to the Google Cloud bucket
-pub async fn upload_files(file_paths: &Vec<Path>) {
-    match None {
-        Some => {
-            todo!();
-            let config = ClientConfig::default().with_auth().await.unwrap();
-            let client = Client::new(config);
+pub async fn upload_files(file_paths: Vec<PathBuf>) {
+    if false {
+        let config = ClientConfig::default().with_auth().await.unwrap();
+        let client = Client::new(config);
 
-            // Upload the file
-            for file_path in file_paths {
-                let upload_type =
-                    UploadType::Simple(Media::new(file_path.basename().to_str().unwrap()));
-                let uploaded = client
-                    .upload_streamed_object(
-                        &UploadObjectRequest {
-                            bucket: "bucket".to_string(),
-                            ..Default::default()
-                        },
-                        std::fs::File::open(file_path).unwrap(),
-                        &upload_type,
-                    )
-                    .await;
-            }
+        // Upload the file
+        for file_path in file_paths.into_iter() {
+            let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+            let upload_type = UploadType::Simple(Media::new(file_name));
+
+            let file = File::open(file_path.clone()).await.unwrap();
+            let file_stream = ReaderStream::new(file);
+
+            let _uploaded = client
+                .upload_streamed_object(
+                    &UploadObjectRequest {
+                        bucket: "bucket".to_string(),
+                        ..Default::default()
+                    },
+                    file_stream,
+                    &upload_type,
+                )
+                .await;
         }
-        None => {
-            println!("not yet implemented: upload files to Google Cloud Storage.");
-            println!("needs authentication environment variables to be set.");
-            for file_path in file_paths {
-                println!("uploading file: {}", file_path);
-            }
+    } else {
+        println!("not yet implemented: upload files to Google Cloud Storage.");
+        println!("needs authentication environment variables to be set.");
+        for file_path in file_paths.iter() {
+            println!("uploading file: {}", file_path.display());
         }
     }
 }
 
-pub fn get_new_recordings(mount_point: &str) -> Vec<Path> {
+pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
     let wav_files = std::fs::read_dir(mount_point)
         .unwrap()
         // Filter out all those directory entries which couldn't be read
@@ -53,28 +56,27 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<Path> {
                     .and_then(|name| name.to_str())
                     .map_or(false, |name| name.starts_with("R_"))
             {
-                Some(entry)
+                Some(path)
             } else {
                 None
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<PathBuf>>();
 
     match get_latest_recording_timestamp() {
         // Filter out all paths with timestamps older than the latest recording timestamp
         Some(timestamp) => wav_files
             .iter()
             .filter_map(|entry| {
-                let path = entry.path();
                 let metadata = entry.metadata().unwrap();
                 let created = metadata.created().unwrap().elapsed().unwrap().as_secs();
                 if created > timestamp {
-                    Some(path)
+                    Some(entry.clone())
                 } else {
                     None
                 }
             })
-            .filtermap(),
+            .collect(),
         // If there is no latest recording timestamp (when the program is run for the first time),
         // just return the latest recording
         None => {
@@ -88,7 +90,7 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<Path> {
                     .unwrap()
                     .as_secs()
             }) {
-                Some(file) => vec![file.path()],
+                Some(file) => vec![file.to_path_buf()],
                 None => vec![],
             }
         }
@@ -96,8 +98,8 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<Path> {
 }
 
 // Store all timestamps of the latest recordings in a file,
-pub fn mark_as_uploaded(new_recordings: &Vec<Path>) {
-    let sorted_timestamps = new_recordings
+pub fn mark_as_uploaded(new_recordings: Vec<PathBuf>) {
+    let mut timestamps = new_recordings
         .iter()
         .map(|entry| {
             entry
@@ -109,8 +111,8 @@ pub fn mark_as_uploaded(new_recordings: &Vec<Path>) {
                 .unwrap()
                 .as_secs()
         })
-        .collect::<Vec<_>>()
-        .sort();
+        .collect::<Vec<_>>();
+    timestamps.sort();
 
     ensure_lib_dir();
     let mut file = std::fs::OpenOptions::new()
@@ -119,7 +121,7 @@ pub fn mark_as_uploaded(new_recordings: &Vec<Path>) {
         .open("/var/lib/audio-publisher/uploaded_recordings.txt")
         .unwrap();
 
-    for timestamp in sorted_timestamps {
+    for timestamp in timestamps {
         writeln!(file, "{}", timestamp).unwrap();
     }
 }
