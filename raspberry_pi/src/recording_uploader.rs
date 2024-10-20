@@ -1,5 +1,6 @@
 use google_cloud_storage::client::{Client, ClientConfig};
 use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest, UploadType};
+use std::error::Error;
 use std::io::BufRead;
 use std::io::Write;
 use std::path::PathBuf;
@@ -7,20 +8,22 @@ use std::time::SystemTime;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 
-// TODO: don't use unwrap, but return a Result so the caller has a chance to unmount the drive
-
 /// Upload the given files to the Google Cloud bucket
-pub async fn upload_files(file_paths: Vec<PathBuf>) {
+pub async fn upload_files(file_paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
     if false {
-        let config = ClientConfig::default().with_auth().await.unwrap();
+        let config = ClientConfig::default().with_auth().await?;
         let client = Client::new(config);
 
         // Upload the file
         for file_path in file_paths.into_iter() {
-            let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+            let file_name = file_path
+                .file_name()
+                .ok_or("error getting file name")?
+                .to_string_lossy()
+                .to_string();
             let upload_type = UploadType::Simple(Media::new(file_name));
 
-            let file = File::open(file_path.clone()).await.unwrap();
+            let file = File::open(file_path.clone()).await?;
             let file_stream = ReaderStream::new(file);
 
             let _uploaded = client
@@ -41,15 +44,16 @@ pub async fn upload_files(file_paths: Vec<PathBuf>) {
             println!("uploading file: {}", file_path.display());
         }
     }
+
+    Ok(())
 }
 
-pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
-    let wav_files = std::fs::read_dir(mount_point)
-        .unwrap()
+pub fn get_new_recordings(mount_point: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let wav_files = std::fs::read_dir(mount_point)?
         // Filter out all those directory entries which couldn't be read
         .filter_map(|res| res.ok())
         // Filter files only
-        .filter(|entry| entry.metadata().unwrap().is_file())
+        .filter(|entry| entry.metadata().map(|m| m.is_file()).unwrap_or(false))
         // Filter R_*.wav files only
         .filter_map(|entry| {
             let path = entry.path();
@@ -66,18 +70,13 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
         })
         .collect::<Vec<PathBuf>>();
 
-    match get_latest_recording_timestamp() {
+    Ok(match get_latest_recording_timestamp_from_state() {
         // Filter out all paths with timestamps older than the latest recording timestamp
         Some(timestamp) => wav_files
             .iter()
             .filter_map(|entry| {
-                let metadata = entry.metadata().unwrap();
-                let created = metadata
-                    .created()
-                    .unwrap()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                let created = get_timestamp_for_path(entry).ok()?;
+
                 if created > timestamp {
                     Some(entry.clone())
                 } else {
@@ -87,56 +86,37 @@ pub fn get_new_recordings(mount_point: &str) -> Vec<PathBuf> {
             .collect(),
         // If there is no latest recording timestamp (when the program is run for the first time),
         // just return the latest recording
-        None => {
-            match wav_files.iter().max_by_key(|entry| {
-                entry
-                    .metadata()
-                    .unwrap()
-                    .created()
-                    .unwrap()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-            }) {
-                Some(file) => vec![file.to_path_buf()],
-                None => vec![],
-            }
-        }
-    }
+        None => match get_latest_path(&wav_files) {
+            Some(file) => vec![file],
+            None => vec![],
+        },
+    })
 }
 
 // Store all timestamps of the latest recordings in a file,
-pub fn mark_as_uploaded(new_recordings: Vec<PathBuf>) {
+pub fn mark_as_uploaded(new_recordings: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
     let mut timestamps = new_recordings
         .iter()
-        .map(|entry| {
-            entry
-                .metadata()
-                .unwrap()
-                .created()
-                .unwrap()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        })
+        .filter_map(|path| get_timestamp_for_path(path).ok())
         .collect::<Vec<_>>();
     timestamps.sort();
 
-    ensure_lib_dir();
+    ensure_lib_dir()?;
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .create(true)
-        .open("/var/lib/audio-publisher/uploaded_recordings.txt")
-        .unwrap();
+        .open("/var/lib/audio-publisher/uploaded_recordings.txt")?;
 
     for timestamp in timestamps {
-        writeln!(file, "{}", timestamp).unwrap();
+        writeln!(file, "{}", timestamp)?;
     }
+
+    Ok(())
 }
 
-// get the last line of the file
-fn get_latest_recording_timestamp() -> Option<u64> {
-    ensure_lib_dir();
+/// Get the last line of the file that stores the timestamps of the uploaded recordings
+fn get_latest_recording_timestamp_from_state() -> Option<u64> {
+    ensure_lib_dir().ok()?;
 
     let file = std::fs::OpenOptions::new()
         .read(true)
@@ -144,13 +124,37 @@ fn get_latest_recording_timestamp() -> Option<u64> {
 
     match file {
         Ok(f) => match std::io::BufReader::new(f).lines().last() {
-            Some(line) => Some(line.unwrap().parse().unwrap()),
+            Some(line) => line.ok()?.parse().ok(),
             None => None,
         },
         Err(_) => None,
     }
 }
 
-fn ensure_lib_dir() {
-    std::fs::create_dir_all("/var/lib/audio-publisher").unwrap();
+fn ensure_lib_dir() -> Result<(), std::io::Error> {
+    std::fs::create_dir_all("/var/lib/audio-publisher")?;
+
+    Ok(())
+}
+
+fn get_timestamp_for_path(path: &PathBuf) -> Result<u64, Box<dyn Error>> {
+    let timestamp = path
+        .metadata()?
+        .created()?
+        .duration_since(SystemTime::UNIX_EPOCH)?
+        .as_secs();
+
+    Ok(timestamp)
+}
+
+fn get_latest_path(paths: &[PathBuf]) -> Option<PathBuf> {
+    paths
+        .iter()
+        .filter_map(|path| {
+            get_timestamp_for_path(path)
+                .ok()
+                .map(|timestamp| (timestamp, path))
+        })
+        .max_by_key(|(timestamp, _)| *timestamp)
+        .map(|(_, path)| path.to_path_buf())
 }

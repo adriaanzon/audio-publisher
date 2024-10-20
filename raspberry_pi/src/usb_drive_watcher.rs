@@ -1,16 +1,17 @@
 use nix::mount::{mount, umount, MsFlags};
+use std::error::Error;
 
 pub async fn watch<F, Fut>(closure: F)
 where
     F: Fn(&str) -> Fut,
-    Fut: std::future::Future<Output = Result<(), Box<dyn std::error::Error>>>,
+    Fut: std::future::Future<Output = Result<(), Box<dyn Error>>>,
 {
     let monitor = udev::MonitorBuilder::new()
-        .unwrap()
+        .expect("Failed to monitor usb events")
         .match_subsystem("block")
-        .unwrap()
+        .expect("Failed to monitor usb events")
         .listen()
-        .unwrap();
+        .expect("Failed to monitor usb events");
 
     loop {
         match monitor.iter().next() {
@@ -36,7 +37,14 @@ where
                     continue;
                 }
 
-                let mount_point = format!("/mnt/{}", event.sysname().to_str().unwrap());
+                let sysname = match event.sysname().to_str() {
+                    Some(s) => s,
+                    None => {
+                        eprintln!("Error getting sysname");
+                        continue;
+                    }
+                };
+                let mount_point = format!("/mnt/{}", sysname);
 
                 // Make directory
                 match std::fs::create_dir_all(&mount_point) {
@@ -47,8 +55,17 @@ where
                     }
                 }
 
-                let source = event.devnode().unwrap();
-                println!("Attempting to mount device at {:?} to {:?}", source, mount_point);
+                let source = match event.devnode() {
+                    Some(s) => s,
+                    None => {
+                        eprintln!("Error getting devnode");
+                        continue;
+                    }
+                };
+                println!(
+                    "Attempting to mount device at {:?} to {:?}",
+                    source, mount_point
+                );
 
                 // Mount
                 match mount(

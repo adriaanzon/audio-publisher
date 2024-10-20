@@ -17,10 +17,10 @@ async fn main() {
         let mount_point = mount_point.to_string();
 
         async move {
-            let new_recordings = get_new_recordings(&mount_point);
+            let new_recordings = get_new_recordings(&mount_point)?;
 
-            upload_files(new_recordings.clone()).await;
-            mark_as_uploaded(new_recordings);
+            upload_files(new_recordings.clone()).await?;
+            mark_as_uploaded(new_recordings)?;
 
             Ok(())
         }
