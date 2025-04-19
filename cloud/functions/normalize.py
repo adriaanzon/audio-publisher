@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def normalize(recording: Path) -> Path:
-    # target location should be a mounted cloud storage
+    # TODO target location should be a mounted cloud storage
     target_location = Path("var/" + splitext(basename(recording))[0] + ".mp3")
 
     subprocess.run(
