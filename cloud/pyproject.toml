@@ -5,11 +5,11 @@ description = "The part of audio-publisher that runs in the cloud"
 readme = "../README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "cloudevents>=1.11.0",
+    "flask>=3.1.0",
     "google-cloud-storage>=2.18.2",
     "jinja2>=3.1.4",
 ]
 
-[tool.uv]
-dev-dependencies = [
-    "flask>=3.0.3",
-]
+[dependency-groups]
+dev = []

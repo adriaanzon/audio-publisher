@@ -1,4 +1,4 @@
 gcp_project = "my-project-id"
-gcp_region = "europe-west4"
+gcp_region = "europe-west1"
 gcp_bucket_location = "EU"
 gcp_bucket_prefix = "my-project-recordings"

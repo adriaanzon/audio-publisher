@@ -21,8 +21,10 @@ First of all, you need to configure the variables in `terraform.tfvars` in your 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Navigate to IAM & Admin > Service Accounts.
 3. Create a new service account or select an existing one.
-4. Assign the necessary roles (e.g., roles/storage.admin for managing storage buckets).
+4. Assign the necessary roles
 5. Generate a JSON key for the service account and download it to service-account.json in the root of the repository.
+
+Before running Terraform, manually enable the Cloud Resource Manager API in Google Cloud.
 
 ### Raspberry Pi
 
@@ -30,4 +32,4 @@ Use Ansible to deploy the upload station on a Raspberry Pi.
 
 ## License
 
-[GNU General Public License v3.0 (GPLv3)](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)
