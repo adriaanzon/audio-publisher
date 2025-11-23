@@ -26,6 +26,15 @@ First of all, you need to configure the variables in `terraform.tfvars` in your 
 
 Before running Terraform, manually enable the Cloud Resource Manager API in Google Cloud.
 
+#### Previewing the audio file listing
+
+To preview the audio file listing locally, you can use the following command:
+
+```bash
+cd cloud
+uv run preview_template.py
+```
+
 ### Raspberry Pi
 
 Use Ansible to deploy the upload station on a Raspberry Pi.

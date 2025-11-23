@@ -1,5 +1,57 @@
-def generate_file_listing():
+from datetime import datetime
+from pathlib import Path
+
+from google.cloud import storage
+from jinja2 import Environment, FileSystemLoader
+
+
+def generate_file_listing(bucket_name: str):
     """
-    Generates a static HTML listing of all files in the cloud bucket.
+    Generates a static HTML listing of all MP3 files in the bucket and uploads it.
+
+    Args:
+        bucket_name: Name of the GCS bucket to list files from
     """
-    all_files = storage.Client().from_service_account_json().list_blobs("recordings")
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+
+    # List all MP3 files in the bucket
+    blobs = list(bucket.list_blobs())
+    mp3_files = [blob for blob in blobs if blob.name.endswith('.mp3')]
+
+    print(f"Found {len(mp3_files)} MP3 files in gs://{bucket_name}")
+
+    # Prepare data for template
+    recordings = []
+    for blob in sorted(mp3_files, key=lambda b: b.updated, reverse=True):
+        recordings.append({
+            'name': blob.name,
+            'url': blob.public_url,
+            'size': format_bytes(blob.size),
+            'updated': blob.updated.isoformat()
+        })
+
+    # Render HTML from template file
+    template_dir = Path(__file__).parent / "templates"
+    env = Environment(loader=FileSystemLoader(template_dir))
+    template = env.get_template("index.html.jinja")
+    html_content = template.render(
+        recordings=recordings,
+        generation_time=datetime.now().isoformat()
+    )
+
+    # Upload index.html to bucket with no-cache headers
+    index_blob = bucket.blob('index.html')
+    index_blob.cache_control = 'no-cache, no-store, must-revalidate'
+    index_blob.upload_from_string(html_content, content_type='text/html')
+
+    print(f"Uploaded index.html to gs://{bucket_name}/index.html")
+
+
+def format_bytes(size: int) -> str:
+    """Format bytes as human-readable string"""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} TB"

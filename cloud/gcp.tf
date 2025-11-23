@@ -2,126 +2,185 @@
 # https://cloud.google.com/functions/docs/tutorials/terraform-pubsub maybe here I can find how to trigger the function when a file is uploaded to a bucket
 
 terraform {
-    required_providers {
-        google = {
-            source = "hashicorp/google"
-            version = ">= 6.8.0"
-        }
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 6.8.0"
     }
+  }
 }
 
-variable gcp_project {
-    description = "The Google Cloud Platform project ID"
-    type = string
+variable "gcp_project" {
+  description = "The Google Cloud Platform project ID"
+  type        = string
 }
 
-variable gcp_region {
-    description = "The Google Cloud Platform region"
-    type = string
+variable "gcp_region" {
+  description = "The Google Cloud Platform region"
+  type        = string
 }
 
-variable gcp_bucket_location {
-    description = "The two-letter location code for the bucket"
-    type = string
+variable "gcp_bucket_location" {
+  description = "The two-letter location code for the bucket"
+  type        = string
 }
 
-variable gcp_bucket_prefix {
-    description = "The name used for the buckets"
-    type = string
+variable "gcp_bucket_prefix" {
+  description = "The name used for the buckets"
+  type        = string
 }
 
 provider "google" {
-    project = var.gcp_project
-    region = var.gcp_region
-    credentials = file("service-account.json")
+  project     = var.gcp_project
+  region      = var.gcp_region
+  credentials = file("service-account.json")
 }
 
 resource "google_project_service" "enable_apis" {
-    for_each = toset([
-        "cloudbuild.googleapis.com",
-        "eventarc.googleapis.com",
-        "run.googleapis.com",
-        "storage.googleapis.com",
-    ])
+  for_each = toset([
+    "cloudbuild.googleapis.com",
+    "eventarc.googleapis.com",
+    "run.googleapis.com",
+    "storage.googleapis.com",
+    "iam.googleapis.com",
+  ])
 
-    project = var.gcp_project
-    service = each.key
+  project = var.gcp_project
+  service = each.key
 }
 
-resource "google_storage_bucket" "functions" {
-    name = "${var.gcp_bucket_prefix}-gcf-source" # Every bucket name must be globally unique
-    location = var.gcp_region
-    uniform_bucket_level_access = true
-}
 resource "google_storage_bucket" "destination" {
-    name = "${var.gcp_bucket_prefix}-normalized" # Every bucket name must be globally unique
-    location = var.gcp_region
-    uniform_bucket_level_access = true
+  name                        = "${var.gcp_bucket_prefix}-normalized" # Every bucket name must be globally unique
+  location                    = var.gcp_region
+  uniform_bucket_level_access = true
 }
 resource "google_storage_bucket" "source" {
-    name = "${var.gcp_bucket_prefix}-wav-source" # Every bucket name must be globally unique
-    location = var.gcp_region
-    uniform_bucket_level_access = true
+  name                        = "${var.gcp_bucket_prefix}-wav-source" # Every bucket name must be globally unique
+  location                    = var.gcp_region
+  uniform_bucket_level_access = true
 }
 
+# Make destination bucket publicly readable for the HTML listing and MP3 files
+resource "google_storage_bucket_iam_member" "destination_public_read" {
+  bucket = google_storage_bucket.destination.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
+# Service account for Eventarc to invoke Cloud Run
+resource "google_service_account" "eventarc_invoker" {
+  account_id   = "eventarc-cloud-run-invoker"
+  display_name = "Eventarc Cloud Run Invoker"
+}
+
+# Allow Eventarc service account to invoke Cloud Run
+resource "google_cloud_run_v2_service_iam_member" "eventarc_invoker" {
+  name     = google_cloud_run_v2_service.default.name
+  location = google_cloud_run_v2_service.default.location
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.eventarc_invoker.email}"
+}
+
+# Allow Eventarc service account to receive events
+resource "google_project_iam_member" "eventarc_event_receiver" {
+  project = var.gcp_project
+  role    = "roles/eventarc.eventReceiver"
+  member  = "serviceAccount:${google_service_account.eventarc_invoker.email}"
+}
+
+# Allow Cloud Storage service account to publish events to Eventarc
+data "google_storage_project_service_account" "gcs_account" {
+  project = var.gcp_project
+}
+
+resource "google_project_iam_member" "gcs_pubsub_publishing" {
+  project = var.gcp_project
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"
+}
 
 # https://cloud.google.com/build/docs/build-push-docker-image
 # Image is built using `gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev` from the cloud directory
 # Later publish the image to GitHub Packages when open-sourcing the project
 resource "google_cloud_run_v2_service" "default" {
-    name = "terminus"
-    location = var.gcp_region
+  name     = "terminus"
+  location = var.gcp_region
 
-    template {
-        containers {
-            image = "europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev"
-        }
+  template {
+    containers {
+      image = "europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev"
+
+      env {
+        name  = "SOURCE_BUCKET"
+        value = google_storage_bucket.source.name
+      }
+
+      env {
+        name  = "DESTINATION_BUCKET"
+        value = google_storage_bucket.destination.name
+      }
     }
+  }
 }
 
-# Create Eventarcs trigger, routing Cloud Storage events to Cloud Run
+# Create Eventarc triggers, routing Cloud Storage events to Cloud Run
 # https://cloud.google.com/eventarc/docs/creating-triggers-terraform
-# TODO: Add Eventarc service account for the buckets
 resource "google_eventarc_trigger" "normalize" {
-    name = "trigger-normalize-incoming-mp3"
-    location = var.gcp_region
+  name     = "trigger-normalize-incoming-mp3"
+  location = var.gcp_region
 
-    # Capture objects changed in the bucket
-    matching_criteria {
-        attribute = "type"
-        value = "google.cloud.storage.object.v1.finalized"
+  # Capture objects changed in the bucket
+  matching_criteria {
+    attribute = "type"
+    value     = "google.cloud.storage.object.v1.finalized"
+  }
+  matching_criteria {
+    attribute = "bucket"
+    value     = google_storage_bucket.source.name
+  }
+  destination {
+    cloud_run_service {
+      service = google_cloud_run_v2_service.default.name
+      region  = google_cloud_run_v2_service.default.location
     }
-    matching_criteria {
-        attribute = "bucket"
-        value = google_storage_bucket.source.name
-    }
-    destination {
-        cloud_run_service {
-            service = google_cloud_run_v2_service.default.name
-            region = google_cloud_run_v2_service.default.location
-        }
-    }
+  }
+
+  service_account = google_service_account.eventarc_invoker.email
+
+  depends_on = [
+    google_cloud_run_v2_service_iam_member.eventarc_invoker,
+    google_project_iam_member.eventarc_event_receiver,
+    google_project_iam_member.gcs_pubsub_publishing
+  ]
 }
 
 resource "google_eventarc_trigger" "generate_file_listing" {
-    name = "trigger-generate-file-listing"
-    location = var.gcp_region
+  name     = "trigger-generate-file-listing"
+  location = var.gcp_region
 
-    # Capture objects changed in the bucket
-    matching_criteria {
-        attribute = "type"
-        value = "google.cloud.storage.object.v1.finalized"
-    }
-    matching_criteria {
-        attribute = "bucket"
-        value = google_storage_bucket.destination.name
-    }
+  # Capture objects changed in the bucket
+  matching_criteria {
+    attribute = "type"
+    value     = "google.cloud.storage.object.v1.finalized"
+  }
+  matching_criteria {
+    attribute = "bucket"
+    value     = google_storage_bucket.destination.name
+  }
 
-    # Send events to the Cloud Run service
-    destination {
-        cloud_run_service {
-            service = google_cloud_run_v2_service.default.name
-            region = google_cloud_run_v2_service.default.location
-        }
+  # Send events to the Cloud Run service
+  destination {
+    cloud_run_service {
+      service = google_cloud_run_v2_service.default.name
+      region  = google_cloud_run_v2_service.default.location
     }
+  }
+
+  service_account = google_service_account.eventarc_invoker.email
+
+  depends_on = [
+    google_cloud_run_v2_service_iam_member.eventarc_invoker,
+    google_project_iam_member.eventarc_event_receiver,
+    google_project_iam_member.gcs_pubsub_publishing
+  ]
 }
