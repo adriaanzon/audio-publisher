@@ -22,11 +22,29 @@ First of all, you need to configure the variables in `terraform.tfvars` in your 
 2. Navigate to IAM & Admin > Service Accounts.
 3. Create a new service account or select an existing one.
 4. Assign the necessary roles
-5. Generate a JSON key for the service account and download it to service-account.json in the root of the repository.
+5. Generate a JSON key for the service account and download it to `cloud/service-account.json` in the repository (this file is git-ignored).
 
 Before running Terraform, manually enable the Cloud Resource Manager API in Google Cloud.
 
-#### Previewing the audio file listing
+### Raspberry Pi
+
+#### Installing Raspberry Pi OS Lite
+
+The Raspberry Pi should be running Raspberry Pi OS Lite. You can install it using the [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+
+- When prompted to choose an OS, select "Raspberry Pi OS (other)" > "Raspberry Pi OS Lite (64-bit)".
+- In the Customization step, configure:
+    - User: Set a username (e.g. `pi`) and password
+    - Wi-Fi: Set the SSID and password for your network (if not using Ethernet)
+    - Remote access: Enable SSH, and use public key authentication
+
+#### Deploying the watcher
+
+Use `raspberry_pi/deploy.sh` to deploy the current working version of the watcher to the Raspberry Pi. The script uses Ansible to configure Raspberry Pi OS Lite.
+
+## Development
+
+### Previewing the audio file listing
 
 To preview the audio file listing locally, you can use the following command:
 
@@ -35,9 +53,27 @@ cd cloud
 uv run preview_template.py
 ```
 
-### Raspberry Pi
+### Building and deploying the Docker image
 
-Use Ansible to deploy the upload station on a Raspberry Pi.
+```bash
+cd cloud
+gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev
+```
+
+### Infrastructure (Terraform)
+
+```bash
+cd cloud
+
+# Initialize Terraform
+terraform init
+
+# Plan changes
+terraform plan
+
+# Apply infrastructure
+terraform apply
+```
 
 ## License
 

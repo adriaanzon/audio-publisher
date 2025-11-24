@@ -1,0 +1,8 @@
+---
+all:
+  children:
+    raspberry_pi:
+      hosts:
+        pi:
+          ansible_host: "{{ pi_host }}"
+          ansible_user: "{{ pi_user }}"

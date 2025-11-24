@@ -1,0 +1,28 @@
+[Unit]
+Description=Audio Publisher - USB Recording Uploader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={{ app_dir }}/{{ binary_name }}
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment="GCS_BUCKET={{ gcs_bucket }}"
+Environment="GOOGLE_APPLICATION_CREDENTIALS={{ app_dir }}/service-account.json"
+
+# Run as root (required for mounting USB drives)
+User=root
+Group=root
+
+# Security settings
+PrivateTmp=yes
+NoNewPrivileges=no
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/audio-publisher /mnt
+
+[Install]
+WantedBy=multi-user.target

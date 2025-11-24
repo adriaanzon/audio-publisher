@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+See also the main @README.md for overall project context.
+
 ## Project Overview
 
 The Station is an audio upload and processing system for recordings from a Behringer X32 console. It consists of two main components:
@@ -21,86 +23,28 @@ The Station is an audio upload and processing system for recordings from a Behri
   - On first run, uploads only the latest recording; subsequently uploads all new recordings
   - Cloud upload is currently stubbed out (see `upload_files()`)
 
+#### Infrastructure (`raspberry_pi/ansible/`)
+
+- Uses Ansible to configure Raspberry Pi OS Lite
+- Any secrets should be read from Terraform files to reduce duplication. Do not hardcode secrets like credentials or bucket names in Ansible playbooks, as it is important to keep any potentially sensitive information out of version control.
+
 ### Cloud Component (`cloud/`)
 
 - **Main entry**: `src/main.py` - Flask app that receives Cloud Storage events via Eventarc
 - **Normalization**: `src/normalize.py` - Uses FFmpeg to normalize audio to -16dB LUFS and remove silences
 - **File Listing**: `src/generate_file_listing.py` - Generates HTML listing of processed recordings
 
-### Infrastructure (`cloud/gcp.tf`)
+#### Considerations
+
+- **Infrastructure as Code**: ALL infrastructure changes (creating/deleting resources, modifying IAM, bucket configurations, etc.) must be made via Terraform. Read-only operations (`gsutil ls`, `gcloud run services logs`, etc.) and application deployments (building/pushing Docker images, updating service images) are fine to do via CLI tools. Do not hardcode credentials or resource names in application code; use environment variables or Terraform-managed secrets.
+- **Docker Image**: Must be built and pushed before deploying Cloud Run service. Terraform references hardcoded Artifact Registry path.
+- **Deployment Order**: 1) Build/push Docker image, 2) Apply Terraform, 3) Update Cloud Run service if image changed
+- **Public Access**: Recordings are publicly accessible at `https://storage.googleapis.com/{destination-bucket}/index.html`
+
+#### Infrastructure (`cloud/gcp.tf`)
 
 - **Storage**: Two GCS buckets (source WAV files, normalized MP3 files). Destination bucket is publicly readable for web access.
 - **Compute**: Cloud Run service running containerized Flask app with FFmpeg
 - **Events**: Eventarc triggers route Cloud Storage object finalization events to Cloud Run
 - **IAM**: Service account (`eventarc-cloud-run-invoker`) with roles for invoking Cloud Run and receiving events
 - **APIs**: Requires Cloud Build, Eventarc, Cloud Run, Storage, and IAM APIs enabled
-
-## Development Commands
-
-### Raspberry Pi (Rust)
-
-```bash
-# Build for aarch64 (Raspberry Pi)
-cd raspberry_pi
-cargo build --target aarch64-unknown-linux-gnu
-
-# Run locally (requires root)
-sudo cargo run
-```
-
-The build target is configured in `Cargo.toml` for cross-compilation to ARM64.
-
-### Cloud (Python)
-
-```bash
-cd cloud
-
-# Install dependencies with uv
-uv sync
-
-# Run locally
-uv run python src/main.py
-
-# Build and push Docker image
-gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev
-```
-
-### Infrastructure (Terraform)
-
-```bash
-cd cloud
-
-# Initialize Terraform
-terraform init
-
-# Plan changes
-terraform plan
-
-# Apply infrastructure
-terraform apply
-```
-
-**Important**: Before running Terraform:
-1. Copy `terraform.tfvars.example` to `terraform.tfvars` and configure variables
-2. Place service account JSON key at `cloud/service-account.json`
-3. Manually enable Cloud Resource Manager API in Google Cloud Console
-
-## Key Implementation Details
-
-### Raspberry Pi
-- **USB Detection**: Uses `udev` to detect partition add events, not full device events
-- **File System**: Assumes VFAT file system for USB drives (see `usb_drive_watcher.rs:74`)
-- **State Tracking**: Recording upload state is maintained in `/var/lib/audio-publisher/uploaded_recordings.txt` using Unix timestamps
-
-### Cloud
-- **Event-Driven Architecture**: Two Eventarc triggers watch different buckets (source for normalization, destination for listing generation)
-- **FFmpeg Processing**: Audio normalization uses `loudnorm=I=-16` and `silenceremove=stop_periods=-1:stop_duration=10:stop_threshold=-50dB`
-- **Temporary Files**: Processing uses `tempfile.TemporaryDirectory()` for download/processing/upload workflow
-- **Docker Build**: Multi-stage build using `uv` for dependency management and Alpine for minimal image size
-- **Public Access**: Recordings are publicly accessible at `https://storage.googleapis.com/{destination-bucket}/index.html`
-
-### Important Considerations
-- **Infrastructure as Code**: ALL infrastructure changes (creating/deleting resources, modifying IAM, bucket configurations, etc.) must be made via Terraform. Read-only operations (`gsutil ls`, `gcloud run services logs`, etc.) and application deployments (building/pushing Docker images, updating service images) are fine to do via CLI tools.
-- **Docker Image**: Must be built and pushed before deploying Cloud Run service. Terraform references hardcoded Artifact Registry path.
-- **Rate Limiting**: Rapid uploads can trigger GCS rate limits on `index.html` (429 errors). This is expected behavior and doesn't affect functionality.
-- **Deployment Order**: 1) Build/push Docker image, 2) Apply Terraform, 3) Update Cloud Run service if image changed

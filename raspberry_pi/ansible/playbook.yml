@@ -1,0 +1,80 @@
+---
+- name: Deploy Audio Publisher to Raspberry Pi
+  hosts: raspberry_pi
+  become: yes
+
+  vars_files:
+    - vars.yml
+
+  vars:
+    app_dir: /opt/audio-publisher
+    service_name: audio-publisher
+    binary_name: raspberry_pi
+
+  pre_tasks:
+    - name: Check gcs_bucket variable is set
+      fail:
+        msg: "gcs_bucket must be set in vars.yml"
+      when: gcs_bucket is not defined or gcs_bucket == ''
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - libudev-dev
+        state: present
+        update_cache: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create state directory
+      file:
+        path: /var/lib/audio-publisher
+        state: directory
+        mode: '0755'
+
+    - name: Copy binary to Raspberry Pi
+      copy:
+        src: ../target/aarch64-unknown-linux-gnu/release/{{ binary_name }}
+        dest: "{{ app_dir }}/{{ binary_name }}"
+        mode: '0755'
+      notify: Restart service
+
+    - name: Copy service account credentials
+      copy:
+        src: ../../cloud/service-account.json
+        dest: "{{ app_dir }}/service-account.json"
+        mode: '0600'
+
+    - name: Install systemd service file
+      template:
+        src: audio-publisher.service.j2
+        dest: /etc/systemd/system/{{ service_name }}.service
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart service
+
+    - name: Enable service
+      systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+
+    - name: Start service
+      systemd:
+        name: "{{ service_name }}"
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart service
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted

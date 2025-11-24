@@ -1,48 +1,39 @@
-use google_cloud_storage::client::{Client, ClientConfig};
-use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest, UploadType};
+use google_cloud_storage::client::Storage;
 use std::error::Error;
 use std::io::BufRead;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use tokio::fs::File;
-use tokio_util::io::ReaderStream;
 
 /// Upload the given files to the Google Cloud bucket
 pub async fn upload_files(file_paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-    if false {
-        let config = ClientConfig::default().with_auth().await?;
-        let client = Client::new(config);
+    let bucket_name = std::env::var("GCS_BUCKET")
+        .map_err(|_| "GCS_BUCKET environment variable must be set")?;
 
-        // Upload the file
-        for file_path in file_paths.into_iter() {
-            let file_name = file_path
-                .file_name()
-                .ok_or("error getting file name")?
-                .to_string_lossy()
-                .to_string();
-            let upload_type = UploadType::Simple(Media::new(file_name));
+    let storage = Storage::builder().build().await?;
+    let bucket = format!("projects/_/buckets/{}", bucket_name);
 
-            let file = File::open(file_path.clone()).await?;
-            let file_stream = ReaderStream::new(file);
+    println!("Uploading {} file(s) to bucket: {}", file_paths.len(), bucket_name);
 
-            let _uploaded = client
-                .upload_streamed_object(
-                    &UploadObjectRequest {
-                        bucket: "bucket".to_string(),
-                        ..Default::default()
-                    },
-                    file_stream,
-                    &upload_type,
-                )
-                .await;
-        }
-    } else {
-        println!("not yet implemented: upload files to Google Cloud Storage.");
-        println!("needs authentication environment variables to be set.");
-        for file_path in file_paths.iter() {
-            println!("uploading file: {}", file_path.display());
-        }
+    // Upload the file
+    for file_path in file_paths.into_iter() {
+        let file_name = file_path
+            .file_name()
+            .ok_or("error getting file name")?
+            .to_string_lossy()
+            .to_string();
+
+        println!("Uploading: {}", file_name);
+
+        let file = File::open(&file_path).await?;
+
+        storage
+            .write_object(&bucket, &file_name, file)
+            .send_buffered()
+            .await?;
+
+        println!("Successfully uploaded: {}", file_name);
     }
 
     Ok(())
