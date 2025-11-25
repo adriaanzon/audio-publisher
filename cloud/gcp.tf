@@ -107,8 +107,17 @@ resource "google_cloud_run_v2_service" "default" {
   location = var.gcp_region
 
   template {
+    timeout = "900s"  # 15 minutes
+
     containers {
       image = "europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev"
+
+      resources {
+        limits = {
+          cpu    = "2"
+          memory = "2Gi"
+        }
+      }
 
       env {
         name  = "SOURCE_BUCKET"
@@ -183,4 +192,45 @@ resource "google_eventarc_trigger" "generate_file_listing" {
     google_project_iam_member.eventarc_event_receiver,
     google_project_iam_member.gcs_pubsub_publishing
   ]
+}
+
+# Update PubSub subscriptions created by Eventarc to configure ack deadline
+# This prevents duplicate event processing due to the default 10s timeout
+# Using null_resource because Terraform doesn't support managing Eventarc subscriptions directly
+# https://github.com/hashicorp/terraform-provider-google/issues/17701
+resource "null_resource" "update_normalize_subscription_ack" {
+  # Set ack deadline to 10 minutes (600s) to match Cloud Run timeout
+  # Default 10s causes duplicate processing for long-running FFmpeg tasks
+  provisioner "local-exec" {
+    command = <<-EOT
+      SUBSCRIPTION=$(gcloud pubsub subscriptions list \
+        --filter="name~eventarc-${var.gcp_region}-${google_eventarc_trigger.normalize.name}-sub" \
+        --format="value(name)" | head -1)
+      gcloud pubsub subscriptions update $SUBSCRIPTION --ack-deadline=600
+    EOT
+  }
+
+  depends_on = [google_eventarc_trigger.normalize]
+
+  # Re-run if trigger is recreated
+  triggers = {
+    trigger_id = google_eventarc_trigger.normalize.id
+  }
+}
+
+resource "null_resource" "update_file_listing_subscription_ack" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      SUBSCRIPTION=$(gcloud pubsub subscriptions list \
+        --filter="name~eventarc-${var.gcp_region}-${google_eventarc_trigger.generate_file_listing.name}-sub" \
+        --format="value(name)" | head -1)
+      gcloud pubsub subscriptions update $SUBSCRIPTION --ack-deadline=600
+    EOT
+  }
+
+  depends_on = [google_eventarc_trigger.generate_file_listing]
+
+  triggers = {
+    trigger_id = google_eventarc_trigger.generate_file_listing.id
+  }
 }

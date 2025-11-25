@@ -99,6 +99,27 @@
         .download-btn:hover {
             background: #5a3dd5;
         }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8125em;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+        .status-processing {
+            background: rgba(255, 149, 0, 0.1);
+            color: #ff9500;
+        }
+        .recording.processing {
+            opacity: 0.7;
+        }
+        .recording.processing .recording-name {
+            cursor: default;
+            pointer-events: none;
+        }
         .empty-state {
             padding: 80px 20px;
             text-align: center;
@@ -156,6 +177,9 @@
             footer {
                 color: #a1a1a6;
             }
+            .status-processing {
+                background: rgba(255, 149, 0, 0.2);
+            }
         }
     </style>
 </head>
@@ -168,20 +192,32 @@
         <div class="recordings">
             {% if recordings %}
                 {% for recording in recordings %}
-                <div class="recording">
+                <div class="recording {% if recording.status == 'processing' %}processing{% endif %}">
                     <div class="recording-header">
+                        {% if recording.status == 'ready' %}
                         <a href="{{ recording.url }}" class="recording-name">{{ recording.name }}</a>
+                        {% else %}
+                        <span class="recording-name">{{ recording.name }}</span>
+                        {% endif %}
                         <div class="recording-info">
+                            {% if recording.status == 'ready' %}
                             <span>{{ recording.size }}</span>
                             <span>•</span>
+                            {% endif %}
                             <span class="timestamp">{{ recording.updated }}</span>
                         </div>
                     </div>
+                    {% if recording.status == 'ready' %}
                     <audio controls preload="none">
                         <source src="{{ recording.url }}" type="audio/mpeg">
                         Your browser does not support the audio element.
                     </audio>
                     <a href="{{ recording.url }}" download="{{ recording.name }}" class="download-btn" aria-label="Download">↓</a>
+                    {% else %}
+                    <span class="status-badge status-processing">
+                        Processing
+                    </span>
+                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}

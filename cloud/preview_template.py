@@ -20,16 +20,25 @@ def index():
         "index.html.jinja",
         recordings=[
             {
+                "name": "R_20250101-000003.mp3",
+                "url": None,
+                "size": None,
+                "updated": datetime.now().isoformat(),
+                "status": "processing"
+            },
+            {
                 "name": "R_20250101-000001.mp3",
                 "url": "https://storage.googleapis.com/example-bucket/R_20250101-000001.mp3",
                 "size": "12.3 MB",
-                "updated": "2025-11-23T10:30:00+00:00"
+                "updated": "2025-11-23T10:30:00+00:00",
+                "status": "ready"
             },
             {
                 "name": "R_20250101-000002.mp3",
                 "url": "https://storage.googleapis.com/example-bucket/R_20250101-000002.mp3",
                 "size": "15.7 MB",
-                "updated": "2025-11-23T19:00:00+00:00"
+                "updated": "2025-11-23T19:00:00+00:00",
+                "status": "ready"
             },
         ],
         generation_time=datetime.now().isoformat()

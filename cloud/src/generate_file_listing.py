@@ -15,21 +15,41 @@ def generate_file_listing(bucket_name: str):
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
 
-    # List all MP3 files in the bucket
+    # List all MP3 and JSON files in the bucket
     blobs = list(bucket.list_blobs())
-    mp3_files = [blob for blob in blobs if blob.name.endswith('.mp3')]
+    mp3_files = {blob.name: blob for blob in blobs if blob.name.endswith('.mp3')}
+    json_files = {blob.name: blob for blob in blobs if blob.name.endswith('.json') and blob.name != 'index.html'}
 
-    print(f"Found {len(mp3_files)} MP3 files in gs://{bucket_name}")
+    print(f"Found {len(mp3_files)} MP3 files and {len(json_files)} processing placeholders in gs://{bucket_name}")
 
-    # Prepare data for template
+    # Prepare data for template - combine MP3s and processing files
     recordings = []
-    for blob in sorted(mp3_files, key=lambda b: b.updated, reverse=True):
+
+    # Add completed MP3 files
+    for name, blob in mp3_files.items():
         recordings.append({
-            'name': blob.name,
+            'name': name,
             'url': blob.public_url,
             'size': format_bytes(blob.size),
-            'updated': blob.updated.isoformat()
+            'updated': blob.updated.isoformat(),
+            'status': 'ready'
         })
+
+    # Add files still being processed (have JSON but no MP3)
+    for name, blob in json_files.items():
+        base_name = name.replace('.json', '')
+        mp3_name = base_name + '.mp3'
+        if mp3_name not in mp3_files:
+            recordings.append({
+                'name': mp3_name,
+                'url': None,
+                'size': None,
+                'updated': blob.updated.isoformat(),
+                'status': 'processing'
+            })
+
+    # Sort by update time, newest first
+    recordings.sort(key=lambda r: r['updated'], reverse=True)
 
     # Render HTML from template file
     template_dir = Path(__file__).parent / "templates"

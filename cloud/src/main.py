@@ -38,12 +38,16 @@ def handle_event():
         return f"Normalized {object_name}", 200
 
     elif bucket_name == DESTINATION_BUCKET:
-        # New MP3 file created - regenerate file listing
-        # Ignore index.html to prevent infinite loop
+        # Ignore index.html and JSON placeholders
         if object_name == "index.html":
             print(f"Ignoring index.html upload to prevent infinite loop")
             return "Ignored index.html", 200
 
+        if object_name.endswith(".json"):
+            print(f"Ignoring JSON placeholder: {object_name}")
+            return "Ignored placeholder", 200
+
+        # New MP3 file created - regenerate file listing
         print(f"Regenerating file listing after upload of: {object_name}")
         generate_file_listing(DESTINATION_BUCKET)
         return f"Generated file listing", 200
