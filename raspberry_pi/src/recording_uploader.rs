@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 use tokio::fs::File;
 
+use crate::console_format;
+
 /// Upload the given files to the Google Cloud bucket
 pub async fn upload_files(file_paths: Vec<PathBuf>) -> Result<()> {
     let bucket_name = std::env::var("GCS_BUCKET")
@@ -49,15 +51,10 @@ pub fn get_new_recordings(mount_point: &str) -> Result<Vec<PathBuf>> {
         .filter_map(|res| res.ok())
         // Filter files only
         .filter(|entry| entry.metadata().map(|m| m.is_file()).unwrap_or(false))
-        // Filter R_*.wav files only
+        // Filter for any supported console format
         .filter_map(|entry| {
             let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("wav")
-                && path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .map_or(false, |name| name.starts_with("R_"))
-            {
+            if console_format::is_valid_recording(&path) {
                 Some(path)
             } else {
                 None

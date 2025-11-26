@@ -2,6 +2,7 @@ use crate::recording_uploader::{get_new_recordings, mark_as_uploaded, upload_fil
 use nix::unistd::Uid;
 use std::process::exit;
 
+mod console_format;
 mod recording_uploader;
 mod usb_drive_watcher;
 

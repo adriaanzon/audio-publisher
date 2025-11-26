@@ -6,7 +6,10 @@ Upload station for recordings from an audio console.
 
 ## Compatibility
 
-The Station currently only works with recordings from the Behringer X32 console.
+The Station currently matches file names formats for the following audio consoles:
+
+- Behringer X32: `R_YYYYMMDD-HHMMSS.wav`
+- Allen & Heath CQ: `AHCQ/USBREC/CQ-ST001.WAV`
 
 ## Deployment
 
