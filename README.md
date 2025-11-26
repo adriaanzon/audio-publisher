@@ -60,7 +60,9 @@ uv run preview_template.py
 
 ```bash
 cd cloud
+uv sync
 gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev
+gcloud run services update terminus --region=europe-west1 --image=europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:latest
 ```
 
 ### Infrastructure (Terraform)

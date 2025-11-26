@@ -3,6 +3,9 @@ set -e
 
 # Deployment script for Raspberry Pi audio uploader
 
+# Change to the script's directory
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
 # Check if vars.yml exists
 if [ ! -f "ansible/vars.yml" ]; then
     echo "Error: ansible/vars.yml not found"

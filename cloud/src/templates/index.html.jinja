@@ -113,12 +113,35 @@
             background: rgba(255, 149, 0, 0.1);
             color: #ff9500;
         }
+        .status-error {
+            background: rgba(255, 59, 48, 0.1);
+            color: #ff3b30;
+        }
         .recording.processing {
             opacity: 0.7;
         }
         .recording.processing .recording-name {
             cursor: default;
             pointer-events: none;
+        }
+        .recording.error .recording-name {
+            cursor: default;
+            pointer-events: none;
+        }
+        .error-message {
+            flex-basis: 100%;
+            color: #ff3b30;
+            font-size: 0.9375em;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+        .error-message a {
+            color: #6b4ce6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .error-message a:hover {
+            text-decoration: underline;
         }
         .empty-state {
             padding: 80px 20px;
@@ -180,6 +203,15 @@
             .status-processing {
                 background: rgba(255, 149, 0, 0.2);
             }
+            .status-error {
+                background: rgba(255, 59, 48, 0.2);
+            }
+            .error-message {
+                color: #ff453a;
+            }
+            .error-message a {
+                color: #8b6ff0;
+            }
         }
     </style>
 </head>
@@ -192,7 +224,7 @@
         <div class="recordings">
             {% if recordings %}
                 {% for recording in recordings %}
-                <div class="recording {% if recording.status == 'processing' %}processing{% endif %}">
+                <div class="recording {% if recording.status == 'processing' %}processing{% elif recording.status == 'error' %}error{% endif %}">
                     <div class="recording-header">
                         {% if recording.status == 'ready' %}
                         <a href="{{ recording.url }}" class="recording-name">{{ recording.name }}</a>
@@ -213,6 +245,16 @@
                         Your browser does not support the audio element.
                     </audio>
                     <a href="{{ recording.url }}" download="{{ recording.name }}" class="download-btn" aria-label="Download">↓</a>
+                    {% elif recording.status == 'error' %}
+                    <span class="status-badge status-error">
+                        Error
+                    </span>
+                    {% if recording.error_code == 'zero_byte_file' %}
+                    <div class="error-message">
+                        This recording file is corrupted (0 bytes). This typically happens when the USB drive is removed or the console is powered off before stopping the recording.
+                        <a href="https://www.youtube.com/watch?v=lw5zBkoWAg8" target="_blank" rel="noopener">Watch this video to learn how to recover the lost recording</a>.
+                    </div>
+                    {% endif %}
                     {% else %}
                     <span class="status-badge status-processing">
                         Processing

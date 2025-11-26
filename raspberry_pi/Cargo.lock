@@ -1655,6 +1655,7 @@ dependencies = [
 name = "raspberry_pi"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "google-cloud-storage",
  "nix",
  "tokio",
