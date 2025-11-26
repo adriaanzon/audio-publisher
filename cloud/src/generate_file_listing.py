@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from google.cloud import storage
+from humanize import naturalsize
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -30,7 +31,7 @@ def generate_file_listing(bucket_name: str):
         recordings.append({
             'name': name,
             'url': blob.public_url,
-            'size': format_bytes(blob.size),
+            'size': naturalsize(blob.size),
             'updated': blob.updated.isoformat(),
             'status': 'ready'
         })
@@ -57,7 +58,7 @@ def generate_file_listing(bucket_name: str):
     template = env.get_template("index.html.jinja")
     html_content = template.render(
         recordings=recordings,
-        generation_time=datetime.now().isoformat()
+        generation_time=datetime.now().astimezone().isoformat()
     )
 
     # Upload index.html to bucket with no-cache headers
@@ -66,12 +67,3 @@ def generate_file_listing(bucket_name: str):
     index_blob.upload_from_string(html_content, content_type='text/html')
 
     print(f"Uploaded index.html to gs://{bucket_name}/index.html")
-
-
-def format_bytes(size: int) -> str:
-    """Format bytes as human-readable string"""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size < 1024.0:
-            return f"{size:.1f} {unit}"
-        size /= 1024.0
-    return f"{size:.1f} TB"

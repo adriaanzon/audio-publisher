@@ -1,10 +1,10 @@
+use anyhow::Result;
 use nix::mount::{mount, umount, MsFlags};
-use std::error::Error;
 
 pub async fn watch<F, Fut>(closure: F)
 where
     F: Fn(&str) -> Fut,
-    Fut: std::future::Future<Output = Result<(), Box<dyn Error>>>,
+    Fut: std::future::Future<Output = Result<()>>,
 {
     let monitor = udev::MonitorBuilder::new()
         .expect("Failed to monitor usb events")
