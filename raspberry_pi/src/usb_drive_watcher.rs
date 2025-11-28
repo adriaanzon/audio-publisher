@@ -1,3 +1,4 @@
+use crate::led_indicator;
 use anyhow::Result;
 use nix::mount::{mount, umount, MsFlags};
 
@@ -85,6 +86,7 @@ where
                 // No use of `continue` from here, must always unmount
 
                 println!("Mounted");
+                led_indicator::turn_on();
 
                 match closure(&mount_point).await {
                     Ok(_) => {}
@@ -93,6 +95,7 @@ where
 
                 // Unmount
                 let _ = umount(mount_point.as_str());
+                led_indicator::turn_off();
                 println!("Unmounted");
             }
         }

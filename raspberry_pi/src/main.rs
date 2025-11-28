@@ -3,6 +3,7 @@ use nix::unistd::Uid;
 use std::process::exit;
 
 mod console_format;
+mod led_indicator;
 mod recording_uploader;
 mod usb_drive_watcher;
 
@@ -13,6 +14,8 @@ async fn main() {
         eprintln!("Try running the command using sudo.");
         exit(1);
     }
+
+    led_indicator::initialize();
 
     usb_drive_watcher::watch(|mount_point| {
         let mount_point = mount_point.to_string();

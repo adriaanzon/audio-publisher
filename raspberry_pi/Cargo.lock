@@ -1658,6 +1658,7 @@ dependencies = [
  "anyhow",
  "google-cloud-storage",
  "nix",
+ "rppal",
  "tokio",
  "tokio-util",
  "udev",
@@ -1747,6 +1748,15 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rppal"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b37e992f3222e304708025de77c9e395068a347449d0d7164f52d3beccdbd8d"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
