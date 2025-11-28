@@ -62,3 +62,69 @@ pub fn all_formats() -> Vec<Box<dyn ConsoleFormat>> {
 pub fn is_valid_recording(path: &Path) -> bool {
     all_formats().iter().any(|format| format.matches(path))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_behringer_x32_valid() {
+        let path = PathBuf::from("R_2025-01-15_14-30-00.wav");
+        assert!(BehringerX32.matches(&path));
+    }
+
+    #[test]
+    fn test_behringer_x32_invalid_wrong_extension() {
+        let path = PathBuf::from("R_2025-01-15_14-30-00.mp3");
+        assert!(!BehringerX32.matches(&path));
+    }
+
+    #[test]
+    fn test_behringer_x32_invalid_wrong_prefix() {
+        let path = PathBuf::from("X_2025-01-15_14-30-00.wav");
+        assert!(!BehringerX32.matches(&path));
+    }
+
+    #[test]
+    fn test_allen_heath_cq_valid() {
+        let path = PathBuf::from("AHCQ/USBREC/CQ-ST001.WAV");
+        assert!(AllenHeathCQ.matches(&path));
+    }
+
+    #[test]
+    fn test_allen_heath_cq_invalid_lowercase_extension() {
+        let path = PathBuf::from("AHCQ/USBREC/CQ-ST001.wav");
+        assert!(!AllenHeathCQ.matches(&path));
+    }
+
+    #[test]
+    fn test_allen_heath_cq_invalid_missing_ahcq_directory() {
+        let path = PathBuf::from("USBREC/CQ-ST001.WAV");
+        assert!(!AllenHeathCQ.matches(&path));
+    }
+
+    #[test]
+    fn test_allen_heath_cq_invalid_wrong_filename_prefix() {
+        let path = PathBuf::from("AHCQ/USBREC/REC-ST001.WAV");
+        assert!(!AllenHeathCQ.matches(&path));
+    }
+
+    #[test]
+    fn test_is_valid_recording_behringer_x32() {
+        let path = PathBuf::from("R_2025-01-15_14-30-00.wav");
+        assert!(is_valid_recording(&path));
+    }
+
+    #[test]
+    fn test_is_valid_recording_allen_heath_cq() {
+        let path = PathBuf::from("AHCQ/USBREC/CQ-ST001.WAV");
+        assert!(is_valid_recording(&path));
+    }
+
+    #[test]
+    fn test_is_valid_recording_invalid_file() {
+        let path = PathBuf::from("random_file.wav");
+        assert!(!is_valid_recording(&path));
+    }
+}
