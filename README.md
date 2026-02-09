@@ -8,7 +8,7 @@ Upload station for recordings from an audio console.
 
 The Station currently matches file names formats for the following audio consoles:
 
-- Behringer X32: `R_YYYYMMDD-HHMMSS.wav`
+- Behringer X32, Midas M32, Behringer Wing: `R_YYYYMMDD-HHMMSS.wav`
 - Allen & Heath CQ: `AHCQ/USBREC/CQ-ST001.WAV`
 
 ## Deployment

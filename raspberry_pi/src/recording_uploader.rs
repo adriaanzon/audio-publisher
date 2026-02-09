@@ -19,7 +19,6 @@ pub async fn upload_files(file_paths: Vec<PathBuf>) -> Result<()> {
 
     println!("Uploading {} file(s) to bucket: {}", file_paths.len(), bucket_name);
 
-    // Upload the file
     for file_path in file_paths.into_iter() {
         let file_name = file_path
             .file_name()
@@ -47,7 +46,6 @@ pub async fn upload_files(file_paths: Vec<PathBuf>) -> Result<()> {
 pub fn get_new_recordings(mount_point: &str) -> Result<Vec<PathBuf>> {
     let wav_files = std::fs::read_dir(mount_point)
         .with_context(|| format!("Failed to read directory: {}", mount_point))?
-        // Filter out all those directory entries which couldn't be read
         .filter_map(|res| res.ok())
         // Filter files only
         .filter(|entry| entry.metadata().map(|m| m.is_file()).unwrap_or(false))
@@ -85,7 +83,29 @@ pub fn get_new_recordings(mount_point: &str) -> Result<Vec<PathBuf>> {
     })
 }
 
-// Store all timestamps of the latest recordings in a file,
+pub fn check_for_suspicious_files(file_paths: &[PathBuf]) -> bool {
+    const SUSPICIOUS_THRESHOLD: u64 = 1024; // 1KB
+
+    let mut has_suspicious = false;
+
+    for path in file_paths {
+        if let Ok(metadata) = std::fs::metadata(path) {
+            let size = metadata.len();
+            if size < SUSPICIOUS_THRESHOLD {
+                eprintln!(
+                    "Warning: Suspiciously small file ({} bytes): {}",
+                    size,
+                    path.display()
+                );
+                has_suspicious = true;
+            }
+        }
+    }
+
+    has_suspicious
+}
+
+/// Store all timestamps of the latest recordings in a file
 pub fn mark_as_uploaded(new_recordings: Vec<PathBuf>) -> Result<()> {
     let mut timestamps = new_recordings
         .iter()

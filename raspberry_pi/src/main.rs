@@ -23,10 +23,12 @@ async fn main() {
         async move {
             let new_recordings = get_new_recordings(&mount_point)?;
 
+            let has_suspicious = recording_uploader::check_for_suspicious_files(&new_recordings);
+
             upload_files(new_recordings.clone()).await?;
             mark_as_uploaded(new_recordings)?;
 
-            Ok(())
+            Ok(has_suspicious)
         }
     })
     .await;

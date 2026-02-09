@@ -5,7 +5,7 @@ use nix::mount::{mount, umount, MsFlags};
 pub async fn watch<F, Fut>(closure: F)
 where
     F: Fn(&str) -> Fut,
-    Fut: std::future::Future<Output = Result<()>>,
+    Fut: std::future::Future<Output = Result<bool>>,
 {
     let monitor = udev::MonitorBuilder::new()
         .expect("Failed to monitor usb events")
@@ -47,7 +47,6 @@ where
                 };
                 let mount_point = format!("/mnt/{}", sysname);
 
-                // Make directory
                 match std::fs::create_dir_all(&mount_point) {
                     Ok(_) => {}
                     Err(e) => {
@@ -86,17 +85,27 @@ where
                 // No use of `continue` from here, must always unmount
 
                 println!("Mounted");
+                led_indicator::stop_blink();
                 led_indicator::turn_on();
 
-                match closure(&mount_point).await {
-                    Ok(_) => {}
-                    Err(e) => eprintln!("Error while executing the watch handler: {}", e),
-                }
+                let has_suspicious = match closure(&mount_point).await {
+                    Ok(flag) => flag,
+                    Err(e) => {
+                        eprintln!("Error while executing the watch handler: {}", e);
+                        false
+                    }
+                };
 
                 // Unmount
                 let _ = umount(mount_point.as_str());
                 led_indicator::turn_off();
                 println!("Unmounted");
+
+                // Start blinking if suspicious files were found
+                if has_suspicious {
+                    println!("Suspicious files detected - LED will blink for 15 minutes");
+                    led_indicator::start_blink(900);
+                }
             }
         }
     }

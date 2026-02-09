@@ -37,7 +37,6 @@ impl ConsoleFormat for AllenHeathCQ {
             return false;
         }
 
-        // Check if path contains AHCQ/USBREC/ and filename starts with CQ-ST
         let path_str = path.to_string_lossy();
         if !path_str.contains("AHCQ") || !path_str.contains("USBREC") {
             return false;
