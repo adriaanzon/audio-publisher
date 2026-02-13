@@ -33,7 +33,7 @@ variable "gcp_bucket_prefix" {
 variable "docker_image" {
   description = "The Docker image for the Cloud Run service"
   type        = string
-  default     = "ghcr.io/adriaanzon/audio-publisher:latest"
+  default     = "docker.io/adriaanzon/audio-publisher:latest"
 }
 
 provider "google" {

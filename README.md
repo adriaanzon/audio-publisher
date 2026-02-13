@@ -17,7 +17,7 @@ The Station consists of two parts: the physical upload station and the cloud ser
 
 ### Cloud
 
-The cloud services are deployed on Google Cloud Platform (GCP) using Terraform. Docker images are automatically built and pushed to GitHub Container Registry (ghcr.io) when a new release is published.
+The cloud services are deployed on Google Cloud Platform (GCP) using Terraform. Docker images are automatically built and pushed to Docker Hub when a new release is published.
 
 First of all, you need to configure the variables in `terraform.tfvars` in your local clone of the repository. You can use the [terraform.tfvars.example](terraform.tfvars.example) file as a starting point.
 
