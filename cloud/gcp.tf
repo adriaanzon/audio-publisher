@@ -30,6 +30,12 @@ variable "gcp_bucket_prefix" {
   type        = string
 }
 
+variable "docker_image" {
+  description = "The Docker image for the Cloud Run service"
+  type        = string
+  default     = "ghcr.io/adriaanzon/audio-publisher:latest"
+}
+
 provider "google" {
   project     = var.gcp_project
   region      = var.gcp_region
@@ -38,7 +44,6 @@ provider "google" {
 
 resource "google_project_service" "enable_apis" {
   for_each = toset([
-    "cloudbuild.googleapis.com",
     "eventarc.googleapis.com",
     "run.googleapis.com",
     "storage.googleapis.com",
@@ -99,9 +104,7 @@ resource "google_project_iam_member" "gcs_pubsub_publishing" {
   member  = "serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"
 }
 
-# https://cloud.google.com/build/docs/build-push-docker-image
-# Image is built using `gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev` from the cloud directory
-# Later publish the image to GitHub Packages when open-sourcing the project
+# Image is built and pushed to GHCR by the GitHub Actions release workflow
 resource "google_cloud_run_v2_service" "default" {
   name     = "terminus"
   location = var.gcp_region
@@ -110,7 +113,7 @@ resource "google_cloud_run_v2_service" "default" {
     timeout = "900s"  # 15 minutes
 
     containers {
-      image = "europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev"
+      image = var.docker_image
 
       resources {
         limits = {

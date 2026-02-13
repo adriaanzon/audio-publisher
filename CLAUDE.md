@@ -36,9 +36,9 @@ The Station is an audio upload and processing system for recordings from a Behri
 
 #### Considerations
 
-- **Infrastructure as Code**: ALL infrastructure changes (creating/deleting resources, modifying IAM, bucket configurations, etc.) must be made via Terraform. Read-only operations (`gsutil ls`, `gcloud run services logs`, etc.) and application deployments (building/pushing Docker images, updating service images) are fine to do via CLI tools. Do not hardcode credentials or resource names in application code; use environment variables or Terraform-managed secrets.
-- **Docker Image**: Must be built and pushed before deploying Cloud Run service. Terraform references hardcoded Artifact Registry path.
-- **Deployment Order**: 1) Build/push Docker image, 2) Apply Terraform, 3) Update Cloud Run service if image changed
+- **Infrastructure as Code**: ALL infrastructure changes (creating/deleting resources, modifying IAM, bucket configurations, etc.) must be made via Terraform. Read-only operations (`gsutil ls`, `gcloud run services logs`, etc.) are fine to do via CLI tools. Do not hardcode credentials or resource names in application code; use environment variables or Terraform-managed secrets.
+- **Docker Image**: Automatically built and pushed to GitHub Container Registry (ghcr.io) via GitHub Actions. The `dev` tag is built on every push to `master` that changes the `cloud/` directory. Release tags (e.g., `v1.2.3`) and `latest` are built when a GitHub release is published.
+- **Deployment**: Simply run `terraform apply` from the `cloud/` directory. The Cloud Run service pulls the image from GHCR (configurable via the `docker_image` variable, defaults to `ghcr.io/adriaanzon/audio-publisher:latest`).
 - **Public Access**: Recordings are publicly accessible at `https://storage.googleapis.com/{destination-bucket}/index.html`
 
 #### Infrastructure (`cloud/gcp.tf`)
@@ -47,4 +47,4 @@ The Station is an audio upload and processing system for recordings from a Behri
 - **Compute**: Cloud Run service running containerized Flask app with FFmpeg
 - **Events**: Eventarc triggers route Cloud Storage object finalization events to Cloud Run
 - **IAM**: Service account (`eventarc-cloud-run-invoker`) with roles for invoking Cloud Run and receiving events
-- **APIs**: Requires Cloud Build, Eventarc, Cloud Run, Storage, and IAM APIs enabled
+- **APIs**: Requires Eventarc, Cloud Run, Storage, and IAM APIs enabled

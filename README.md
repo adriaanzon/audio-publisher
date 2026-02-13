@@ -17,7 +17,7 @@ The Station consists of two parts: the physical upload station and the cloud ser
 
 ### Cloud
 
-The cloud services are deployed on Google Cloud Platform (GCP) using Terraform.
+The cloud services are deployed on Google Cloud Platform (GCP) using Terraform. Docker images are automatically built and pushed to GitHub Container Registry (ghcr.io) when a new release is published.
 
 First of all, you need to configure the variables in `terraform.tfvars` in your local clone of the repository. You can use the [terraform.tfvars.example](terraform.tfvars.example) file as a starting point.
 
@@ -54,15 +54,6 @@ To preview the audio file listing locally, you can use the following command:
 ```bash
 cd cloud
 uv run preview_template.py
-```
-
-### Building and deploying the Docker image
-
-```bash
-cd cloud
-uv sync
-gcloud builds submit --region=europe-west1 --tag europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:dev
-gcloud run services update terminus --region=europe-west1 --image=europe-west1-docker.pkg.dev/triple-shadow-457412-j1/terminus/terminus:latest
 ```
 
 ### Infrastructure (Terraform)
