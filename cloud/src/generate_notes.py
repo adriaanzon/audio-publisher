@@ -104,6 +104,7 @@ def generate_notes(mp3_blob: storage.Blob) -> Notes:
         return Notes.empty()
 
     uploaded = None
+    client = None
     try:
         client = _build_client()
         prompt = load_prompt()
@@ -128,9 +129,9 @@ def generate_notes(mp3_blob: storage.Blob) -> Notes:
         logger.exception("Notes generation failed for %s", mp3_blob.name)
         return Notes.empty()
     finally:
-        if uploaded is not None and uploaded.name is not None:
+        if client is not None and uploaded is not None and uploaded.name is not None:
             try:
-                _build_client().files.delete(name=uploaded.name)
+                client.files.delete(name=uploaded.name)
             except Exception:
                 logger.exception("Failed to delete uploaded Gemini file")
 
