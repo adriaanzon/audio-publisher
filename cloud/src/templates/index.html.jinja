@@ -23,17 +23,17 @@
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
             overflow: hidden;
         }
-        details.recording { border-bottom: 0.5px solid rgba(0, 0, 0, 0.08); }
-        details.recording:last-child { border-bottom: none; }
-        details.recording > summary {
+        .recording { border-bottom: 0.5px solid rgba(0, 0, 0, 0.08); }
+        .recording:last-child { border-bottom: none; }
+        .recording-header {
             padding: 20px 24px;
-            cursor: pointer;
             list-style: none;
             display: flex;
             gap: 16px;
             align-items: baseline;
             flex-wrap: wrap;
         }
+        details.recording > summary { cursor: pointer; }
         details.recording > summary::-webkit-details-marker { display: none; }
         details.recording[open] > summary { border-bottom: 0.5px solid rgba(0, 0, 0, 0.05); }
         .chevron { width: 20px; height: 20px; flex-shrink: 0; color: #86868b; align-self: center; }
@@ -69,6 +69,9 @@
         .error-message a:hover { text-decoration: underline; }
         .empty-state { padding: 80px 20px; text-align: center; color: #86868b; font-size: 1.125em; }
         footer { margin-top: 32px; text-align: center; color: #86868b; font-size: 0.875em; }
+        @media (max-width: 600px) {
+            .summary-date { flex-basis: 100%; }
+        }
         @media (prefers-color-scheme: dark) {
             body { background: #000; }
             h1 { color: #f5f5f7; }
@@ -94,8 +97,15 @@
         <div class="recordings">
             {% if recordings %}
                 {% for recording in recordings %}
+                {% set has_body = recording.description
+                                  or recording.title
+                                  or recording.size
+                                  or recording.suggested_cut
+                                  or recording.status == 'ready'
+                                  or (recording.status == 'error' and recording.error_code == 'zero_byte_file') %}
+                {% if has_body %}
                 <details class="recording">
-                    <summary>
+                    <summary class="recording-header">
                         <svg class="chevron chevron-right" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                         </svg>
@@ -143,6 +153,20 @@
                         {% endif %}
                     </div>
                 </details>
+                {% else %}
+                <div class="recording">
+                    <div class="recording-header">
+                        <span class="chevron" aria-hidden="true"></span>
+                        <span class="summary-title">{{ recording.title or recording.name }}</span>
+                        <span class="summary-date timestamp">{{ recording.updated }}</span>
+                        {% if recording.status == 'processing' %}
+                        <span class="status-badge status-processing">Processing</span>
+                        {% elif recording.status == 'error' %}
+                        <span class="status-badge status-error">Error</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
                 {% endfor %}
             {% else %}
                 <div class="empty-state"><p>No recordings available.</p></div>
