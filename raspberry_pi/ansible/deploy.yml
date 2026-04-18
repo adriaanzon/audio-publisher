@@ -10,12 +10,28 @@
     app_dir: /opt/audio-publisher
     service_name: audio-publisher
     binary_name: raspberry_pi
+    rust_target_map:
+      aarch64: aarch64-unknown-linux-gnu
+      armv7l: armv7-unknown-linux-gnueabihf
+    rust_target: "{{ rust_target_map[ansible_architecture] }}"
 
   pre_tasks:
     - name: Check gcs_bucket variable is set
       fail:
         msg: "gcs_bucket must be set in vars.yml"
       when: gcs_bucket is not defined or gcs_bucket == ''
+
+    - name: Check architecture is supported
+      fail:
+        msg: "Unsupported architecture: {{ ansible_architecture }}"
+      when: ansible_architecture not in rust_target_map
+
+    - name: Build binary for {{ ansible_architecture }}
+      command: cross build --release --target {{ rust_target }}
+      args:
+        chdir: "{{ playbook_dir }}/.."
+      delegate_to: localhost
+      become: no
 
   tasks:
     - name: Install required system packages
@@ -39,7 +55,7 @@
 
     - name: Copy binary to Raspberry Pi
       copy:
-        src: ../target/aarch64-unknown-linux-gnu/release/{{ binary_name }}
+        src: ../target/{{ rust_target }}/release/{{ binary_name }}
         dest: "{{ app_dir }}/{{ binary_name }}"
         mode: '0755'
       notify: Restart service

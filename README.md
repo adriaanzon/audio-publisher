@@ -35,15 +35,26 @@ Before running Terraform, manually enable the Cloud Resource Manager API in Goog
 
 The Raspberry Pi should be running Raspberry Pi OS Lite. You can install it using the [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-- When prompted to choose an OS, select "Raspberry Pi OS (other)" > "Raspberry Pi OS Lite (64-bit)".
+- When prompted to choose an OS, select "Raspberry Pi OS (other)" > "Raspberry Pi OS Lite (64-bit)" (or 32-bit if you're running an older Raspberry Pi model).
 - In the Customization step, configure:
     - User: Set a username (e.g. `pi`) and password
     - Wi-Fi: Set the SSID and password for your network (if not using Ethernet)
     - Remote access: Enable SSH, and use public key authentication
 
+The other steps can be left with their default/blank values.
+
 #### Deploying the watcher
 
-Use `raspberry_pi/deploy.sh` to deploy the current working version of the watcher to the Raspberry Pi. The script uses Ansible to configure Raspberry Pi OS Lite.
+Before the first deploy, copy `raspberry_pi/ansible/vars.yml.example` to `raspberry_pi/ansible/vars.yml` and fill in your values. `vars.yml` is git-ignored.
+
+Deploy the current working version of the watcher with Ansible:
+
+```bash
+cd raspberry_pi/ansible
+ansible-playbook deploy.yml
+```
+
+The playbook detects the Pi's architecture, builds the binary with `cross` for the matching target (arm64 or armv7), and configures Raspberry Pi OS Lite.
 
 ## Development
 
