@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from google.cloud import storage
@@ -132,3 +133,16 @@ def generate_notes(mp3_blob: storage.Blob) -> Notes:
                 _build_client().files.delete(name=uploaded.name)
             except Exception:
                 logger.exception("Failed to delete uploaded Gemini file")
+
+
+def write_ready_json(bucket: storage.Bucket, base_name: str, notes: Notes) -> None:
+    """Overwrite `{base_name}.json` in the destination bucket with a `ready` payload."""
+    payload = {
+        "status": "ready",
+        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "title": notes.title,
+        "description": notes.description,
+        "suggested_cut": notes.suggested_cut.to_dict() if notes.suggested_cut else None,
+    }
+    blob = bucket.blob(f"{base_name}.json")
+    blob.upload_from_string(json.dumps(payload), content_type="application/json")

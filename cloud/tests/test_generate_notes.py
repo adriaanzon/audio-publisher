@@ -198,3 +198,44 @@ class TestGenerateNotes:
         result = generate_notes.generate_notes(blob)
 
         assert result == Notes.empty()
+
+
+class TestWriteReadyJson:
+    def test_writes_ready_status_with_notes(self):
+        from src.generate_notes import write_ready_json
+
+        bucket = Mock()
+        json_blob = Mock()
+        bucket.blob.return_value = json_blob
+
+        notes = Notes(
+            title="T | ref | speaker",
+            description="desc",
+            suggested_cut=SuggestedCut(start="00:05:00", end="00:45:00"),
+        )
+        write_ready_json(bucket, "R_20260418-120000", notes)
+
+        bucket.blob.assert_called_once_with("R_20260418-120000.json")
+        uploaded_json_str = json_blob.upload_from_string.call_args.args[0]
+        payload = _json.loads(uploaded_json_str)
+
+        assert payload["status"] == "ready"
+        assert payload["title"] == "T | ref | speaker"
+        assert payload["description"] == "desc"
+        assert payload["suggested_cut"] == {"start": "00:05:00", "end": "00:45:00"}
+        assert "completed_at" in payload
+
+    def test_writes_nulls_when_notes_empty(self):
+        from src.generate_notes import write_ready_json
+
+        bucket = Mock()
+        json_blob = Mock()
+        bucket.blob.return_value = json_blob
+
+        write_ready_json(bucket, "R_20260418-120000", Notes.empty())
+
+        uploaded = _json.loads(json_blob.upload_from_string.call_args.args[0])
+        assert uploaded["status"] == "ready"
+        assert uploaded["title"] is None
+        assert uploaded["description"] is None
+        assert uploaded["suggested_cut"] is None
