@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -7,150 +8,128 @@ from google.cloud import storage
 from humanize import naturalsize
 from jinja2 import Environment, FileSystemLoader
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Recording:
-    """Represents a recording entry in the file listing."""
     name: str
     updated: str
     status: str
     url: str | None = None
     size: str | None = None
     error_code: str | None = None
+    title: str | None = None
+    description: str | None = None
+    suggested_cut: dict | None = None
 
     def to_template_dict(self) -> dict:
-        """Convert to dictionary for Jinja template."""
         return {
-            'name': self.name,
-            'url': self.url,
-            'size': self.size,
-            'updated': self.updated,
-            'status': self.status,
-            'error_code': self.error_code
+            "name": self.name,
+            "url": self.url,
+            "size": self.size,
+            "updated": self.updated,
+            "status": self.status,
+            "error_code": self.error_code,
+            "title": self.title,
+            "description": self.description,
+            "suggested_cut": self.suggested_cut,
         }
 
 
-def list_bucket_files(bucket: storage.Bucket) -> tuple[dict[str, storage.Blob], dict[str, storage.Blob]]:
-    """
-    List and categorize files in the bucket.
-
-    Returns:
-        Tuple of (mp3_files, json_files) as dictionaries mapping filename to blob
-    """
+def list_bucket_files(
+    bucket: storage.Bucket,
+) -> tuple[dict[str, storage.Blob], dict[str, storage.Blob]]:
     blobs = list(bucket.list_blobs())
-    mp3_files = {blob.name: blob for blob in blobs if blob.name.endswith('.mp3')}
+    mp3_files = {b.name: b for b in blobs if b.name.endswith(".mp3")}
     json_files = {
-        blob.name: blob
-        for blob in blobs
-        if blob.name.endswith('.json') and blob.name != 'index.html'
+        b.name: b for b in blobs if b.name.endswith(".json") and b.name != "index.html"
     }
-
-    print(f"Found {len(mp3_files)} MP3 files and {len(json_files)} processing placeholders in gs://{bucket.name}")
+    logger.info(
+        "Found %d MP3 files and %d JSON files in gs://%s",
+        len(mp3_files),
+        len(json_files),
+        bucket.name,
+    )
     return mp3_files, json_files
 
 
-def parse_processing_status(json_blob: storage.Blob) -> tuple[str, str | None]:
-    """
-    Parse status information from a JSON placeholder file.
-
-    Returns:
-        Tuple of (status, error_code)
-    """
+def _parse_json_payload(blob: storage.Blob) -> dict:
     try:
-        json_content = json_blob.download_as_text()
-        json_data = json.loads(json_content)
-        return json_data.get('status', 'processing'), json_data.get('error_code')
+        return json.loads(blob.download_as_text())
     except Exception:
-        return 'processing', None
+        return {"status": "processing"}
 
 
-def build_recordings_from_mp3s(mp3_files: dict[str, storage.Blob]) -> list[Recording]:
-    """Build Recording objects from completed MP3 files."""
-    return [
-        Recording(
-            name=name,
-            url=blob.public_url,
-            size=naturalsize(blob.size),
-            updated=blob.updated.isoformat(),
-            status='ready'
-        )
-        for name, blob in mp3_files.items()
-    ]
-
-
-def build_recordings_from_placeholders(
+def build_recordings(
     json_files: dict[str, storage.Blob],
-    mp3_files: dict[str, storage.Blob]
-) -> list[Recording]:
-    """Build Recording objects from JSON placeholders (in-progress or failed)."""
-    recordings = []
-
-    for name, blob in json_files.items():
-        base_name = name.replace('.json', '')
-        mp3_name = f"{base_name}.mp3"
-
-        # Only include if the MP3 doesn't exist yet
-        if mp3_name not in mp3_files:
-            status, error_code = parse_processing_status(blob)
-            recordings.append(Recording(
-                name=mp3_name,
-                url=None,
-                size=None,
-                updated=blob.updated.isoformat(),
-                status=status,
-                error_code=error_code
-            ))
-
-    return recordings
-
-
-def build_all_recordings(
     mp3_files: dict[str, storage.Blob],
-    json_files: dict[str, storage.Blob]
 ) -> list[Recording]:
-    """Build complete list of recordings, sorted by update time (newest first)."""
-    recordings = build_recordings_from_mp3s(mp3_files)
-    recordings.extend(build_recordings_from_placeholders(json_files, mp3_files))
+    """Iterate over JSON blobs, pairing each with its MP3 by base name.
+    MP3s without a paired JSON are skipped (migration handles them)."""
+    recordings: list[Recording] = []
+
+    for json_name, json_blob in json_files.items():
+        base = json_name[: -len(".json")]
+        mp3_name = f"{base}.mp3"
+        mp3_blob = mp3_files.get(mp3_name)
+        payload = _parse_json_payload(json_blob)
+        status = payload.get("status", "processing")
+
+        if status == "ready" and mp3_blob is None:
+            logger.warning(
+                "JSON %s is ready but %s is missing — skipping", json_name, mp3_name
+            )
+            continue
+
+        recording = Recording(
+            name=mp3_name,
+            updated=json_blob.updated.isoformat() if json_blob.updated else "",
+            status=status,
+            error_code=payload.get("error_code"),
+            title=payload.get("title"),
+            description=payload.get("description"),
+            suggested_cut=payload.get("suggested_cut"),
+        )
+        if mp3_blob is not None:
+            recording.url = mp3_blob.public_url
+            if mp3_blob.size is not None:
+                recording.size = naturalsize(mp3_blob.size)
+        recordings.append(recording)
+
+    orphan_mp3s = [
+        name for name in mp3_files if name.replace(".mp3", ".json") not in json_files
+    ]
+    for name in orphan_mp3s:
+        logger.warning(
+            "MP3 %s has no paired JSON — skipping (see Migration in the spec)", name
+        )
+
     recordings.sort(key=lambda r: r.updated, reverse=True)
     return recordings
 
 
 def render_listing_page(recordings: list[Recording]) -> str:
-    """Render the HTML listing page using Jinja template."""
     template_dir = Path(__file__).parent / "templates"
     env = Environment(loader=FileSystemLoader(template_dir))
     template = env.get_template("index.html.jinja")
-
     return template.render(
         recordings=[r.to_template_dict() for r in recordings],
-        generation_time=datetime.now().astimezone().isoformat()
+        generation_time=datetime.now().astimezone().isoformat(),
     )
 
 
 def upload_listing_page(bucket: storage.Bucket, html_content: str):
-    """Upload the rendered HTML to the bucket with no-cache headers."""
-    index_blob = bucket.blob('index.html')
-    index_blob.cache_control = 'no-cache, no-store, must-revalidate'
-    index_blob.upload_from_string(html_content, content_type='text/html')
-    print(f"Uploaded index.html to gs://{bucket.name}/index.html")
+    index_blob = bucket.blob("index.html")
+    index_blob.cache_control = "no-cache, no-store, must-revalidate"
+    index_blob.upload_from_string(html_content, content_type="text/html")
+    logger.info("Uploaded index.html to gs://%s/index.html", bucket.name)
 
 
 def generate_file_listing(bucket_name: str):
-    """
-    Generates a static HTML listing of all MP3 files in the bucket and uploads it.
-
-    Args:
-        bucket_name: Name of the GCS bucket to list files from
-    """
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-
-    # List and categorize files
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
     mp3_files, json_files = list_bucket_files(bucket)
-
-    # Build recording entries
-    recordings = build_all_recordings(mp3_files, json_files)
-
-    # Render and upload
+    recordings = build_recordings(json_files, mp3_files)
     html_content = render_listing_page(recordings)
     upload_listing_page(bucket, html_content)

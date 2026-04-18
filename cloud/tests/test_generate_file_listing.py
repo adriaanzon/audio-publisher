@@ -3,70 +3,136 @@ from datetime import datetime
 from unittest.mock import Mock
 
 from src.generate_file_listing import (
-    build_recordings_from_placeholders,
-    build_all_recordings,
-    parse_processing_status,
+    Recording,
+    build_recordings,
 )
 
 
-class TestParseProcessingStatus:
-    def test_invalid_json_defaults_to_processing(self):
-        mock_blob = Mock()
-        mock_blob.download_as_text.return_value = "not valid json"
-
-        status, error_code = parse_processing_status(mock_blob)
-
-        assert status == "processing"
-        assert error_code is None
+def _json_blob(name: str, payload: dict, updated: datetime):
+    blob = Mock()
+    blob.name = name
+    blob.download_as_text.return_value = json.dumps(payload)
+    blob.updated = updated
+    return blob
 
 
-class TestBuildRecordingsFromPlaceholders:
-    def test_placeholder_with_existing_mp3_excluded(self):
-        mock_json_blob = Mock()
-        mock_json_blob.updated = datetime(2025, 1, 15, 10, 30, 0)
-        mock_json_blob.download_as_text.return_value = json.dumps({
-            "status": "processing"
-        })
-
-        mock_mp3_blob = Mock()
-
-        json_files = {"recording.json": mock_json_blob}
-        mp3_files = {"recording.mp3": mock_mp3_blob}
-
-        result = build_recordings_from_placeholders(json_files, mp3_files)
-
-        assert len(result) == 0
+def _mp3_blob(name: str, size: int, updated: datetime, url: str):
+    blob = Mock()
+    blob.name = name
+    blob.size = size
+    blob.updated = updated
+    blob.public_url = url
+    return blob
 
 
-class TestBuildAllRecordings:
-    def test_mixed_sorted_by_updated_desc(self):
-        old_mp3_blob = Mock()
-        old_mp3_blob.public_url = "https://example.com/old.mp3"
-        old_mp3_blob.size = 5_000_000
-        old_mp3_blob.updated = datetime(2025, 1, 15, 8, 0, 0)
+class TestBuildRecordings:
+    def test_ready_json_with_mp3_produces_full_recording(self):
+        json_b = _json_blob(
+            "R_1.json",
+            {
+                "status": "ready",
+                "title": "Wat als Jezus toch anders is? | Lukas 24 | Dennis",
+                "description": "Korte beschrijving.",
+                "suggested_cut": {"start": "00:10:00", "end": "00:55:00"},
+            },
+            updated=datetime(2026, 4, 7, 10, 0, 0),
+        )
+        mp3_b = _mp3_blob(
+            "R_1.mp3", 12_300_000, datetime(2026, 4, 7, 9, 55, 0), "https://e/R_1.mp3"
+        )
 
-        new_mp3_blob = Mock()
-        new_mp3_blob.public_url = "https://example.com/new.mp3"
-        new_mp3_blob.size = 5_000_000
-        new_mp3_blob.updated = datetime(2025, 1, 15, 12, 0, 0)
+        result = build_recordings({"R_1.json": json_b}, {"R_1.mp3": mp3_b})
 
-        processing_json_blob = Mock()
-        processing_json_blob.updated = datetime(2025, 1, 15, 10, 0, 0)
-        processing_json_blob.download_as_text.return_value = json.dumps({
-            "status": "processing"
-        })
+        assert len(result) == 1
+        r = result[0]
+        assert r.status == "ready"
+        assert r.name == "R_1.mp3"
+        assert r.url == "https://e/R_1.mp3"
+        assert r.title.startswith("Wat als")
+        assert r.description == "Korte beschrijving."
+        assert r.suggested_cut == {"start": "00:10:00", "end": "00:55:00"}
 
-        mp3_files = {
-            "old.mp3": old_mp3_blob,
-            "new.mp3": new_mp3_blob
-        }
-        json_files = {
-            "processing.json": processing_json_blob
-        }
+    def test_processing_json_without_mp3(self):
+        json_b = _json_blob(
+            "R_1.json", {"status": "processing"}, datetime(2026, 4, 7, 10, 0, 0)
+        )
 
-        result = build_all_recordings(mp3_files, json_files)
+        result = build_recordings({"R_1.json": json_b}, {})
 
-        assert len(result) == 3
-        assert result[0].name == "new.mp3"
-        assert result[1].name == "processing.mp3"
-        assert result[2].name == "old.mp3"
+        assert len(result) == 1
+        assert result[0].status == "processing"
+        assert result[0].url is None
+
+    def test_error_json_is_rendered(self):
+        json_b = _json_blob(
+            "R_1.json",
+            {"status": "error", "error_code": "zero_byte_file"},
+            datetime(2026, 4, 7, 10, 0, 0),
+        )
+
+        result = build_recordings({"R_1.json": json_b}, {})
+
+        assert len(result) == 1
+        assert result[0].status == "error"
+        assert result[0].error_code == "zero_byte_file"
+
+    def test_orphan_mp3_is_skipped(self):
+        mp3_b = _mp3_blob(
+            "R_1.mp3", 1, datetime(2026, 4, 7, 10, 0, 0), "https://e/R_1.mp3"
+        )
+
+        result = build_recordings({}, {"R_1.mp3": mp3_b})
+
+        assert result == []
+
+    def test_ready_json_without_mp3_is_skipped(self):
+        """Edge case: JSON says ready but the MP3 blob vanished. Treat as inconsistent, skip."""
+        json_b = _json_blob(
+            "R_1.json",
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
+            datetime(2026, 4, 7, 10, 0, 0),
+        )
+
+        result = build_recordings({"R_1.json": json_b}, {})
+
+        assert result == []
+
+    def test_sorted_by_updated_desc(self):
+        older = _json_blob(
+            "R_old.json",
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
+            updated=datetime(2026, 4, 1, 10, 0, 0),
+        )
+        newer = _json_blob(
+            "R_new.json",
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
+            updated=datetime(2026, 4, 7, 10, 0, 0),
+        )
+        old_mp3 = _mp3_blob(
+            "R_old.mp3", 1, datetime(2026, 4, 1, 9, 59), "https://e/old"
+        )
+        new_mp3 = _mp3_blob(
+            "R_new.mp3", 1, datetime(2026, 4, 7, 9, 59), "https://e/new"
+        )
+
+        result = build_recordings(
+            {"R_old.json": older, "R_new.json": newer},
+            {"R_old.mp3": old_mp3, "R_new.mp3": new_mp3},
+        )
+
+        assert [r.name for r in result] == ["R_new.mp3", "R_old.mp3"]

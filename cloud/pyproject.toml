@@ -8,11 +8,13 @@ dependencies = [
     "cloudevents>=1.11.0",
     "flask>=3.1.0",
     "google-cloud-storage>=2.18.2",
+    "google-genai>=1.0.0",
     "humanize>=4.11.0",
     "jinja2>=3.1.4",
 ]
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.408",
     "pytest>=8.3.4",
 ]

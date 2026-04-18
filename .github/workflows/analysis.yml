@@ -1,0 +1,32 @@
+name: Analysis
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/analysis.yml'
+  pull_request:
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/analysis.yml'
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv format --check
+        working-directory: cloud
+
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync
+        working-directory: cloud
+      - run: uv run pyright src/
+        working-directory: cloud
