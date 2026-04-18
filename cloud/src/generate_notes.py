@@ -37,3 +37,98 @@ def is_audio_too_large(blob: storage.Blob) -> bool:
 def load_prompt() -> str:
     path = os.environ.get("PROMPT_FILE", DEFAULT_PROMPT_FILE)
     return Path(path).read_text()
+
+
+import json
+import logging
+import tempfile
+from typing import Optional
+
+from google import genai
+from google.genai import types
+
+logger = logging.getLogger(__name__)
+
+
+RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "title": {"type": "STRING", "nullable": True},
+        "description": {"type": "STRING", "nullable": True},
+        "suggested_cut": {
+            "type": "OBJECT",
+            "nullable": True,
+            "properties": {
+                "start": {"type": "STRING"},
+                "end": {"type": "STRING"},
+            },
+            "required": ["start", "end"],
+        },
+    },
+    "required": ["title", "description", "suggested_cut"],
+}
+
+
+def _build_client() -> genai.Client:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+    return genai.Client(api_key=api_key)
+
+
+def _parse_notes(raw: str) -> Notes:
+    data = json.loads(raw)
+    cut_data = data.get("suggested_cut")
+    cut = (
+        SuggestedCut(start=cut_data["start"], end=cut_data["end"])
+        if cut_data
+        else None
+    )
+    return Notes(
+        title=data.get("title"),
+        description=data.get("description"),
+        suggested_cut=cut,
+    )
+
+
+def generate_notes(mp3_blob: storage.Blob) -> Notes:
+    """
+    Generate AI notes for an MP3 blob. All failures return Notes.empty().
+    """
+    if is_audio_too_large(mp3_blob):
+        logger.info(
+            "Skipping notes: %s is %.1f MB (limit %.0f MB)",
+            mp3_blob.name,
+            (mp3_blob.size or 0) / 1024 / 1024,
+            MAX_AUDIO_SIZE_BYTES / 1024 / 1024,
+        )
+        return Notes.empty()
+
+    uploaded = None
+    try:
+        client = _build_client()
+        prompt = load_prompt()
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+            tmp.write(mp3_blob.download_as_bytes())
+            tmp.flush()
+            uploaded = client.files.upload(file=tmp.name)
+
+        response = client.models.generate_content(
+            model=DEFAULT_MODEL,
+            contents=[uploaded, prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=RESPONSE_SCHEMA,
+            ),
+        )
+        return _parse_notes(response.text)
+    except Exception:
+        logger.exception("Notes generation failed for %s", mp3_blob.name)
+        return Notes.empty()
+    finally:
+        if uploaded is not None:
+            try:
+                _build_client().files.delete(name=uploaded.name)
+            except Exception:
+                logger.exception("Failed to delete uploaded Gemini file")

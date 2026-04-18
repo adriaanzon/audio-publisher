@@ -70,3 +70,131 @@ class TestLoadPrompt:
         monkeypatch.chdir(tmp_path)
 
         assert load_prompt() == "Default prompt."
+
+
+import json as _json
+
+import pytest
+
+
+class TestGenerateNotes:
+    def _blob(self, size=1_000_000):
+        blob = Mock()
+        blob.name = "R_20260418.mp3"
+        blob.size = size
+        blob.download_as_bytes.return_value = b"fake-mp3-bytes"
+        return blob
+
+    def test_returns_empty_when_blob_too_large(self, monkeypatch):
+        from src import generate_notes
+
+        blob = self._blob(size=MAX_AUDIO_SIZE_BYTES + 1)
+        client_factory = Mock(side_effect=AssertionError("should not be called"))
+        monkeypatch.setattr(generate_notes, "_build_client", client_factory)
+
+        result = generate_notes.generate_notes(blob)
+
+        assert result == Notes.empty()
+        client_factory.assert_not_called()
+
+    def test_returns_empty_when_api_key_missing(self, monkeypatch):
+        from src import generate_notes
+
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        blob = self._blob()
+
+        result = generate_notes.generate_notes(blob)
+
+        assert result == Notes.empty()
+
+    def test_returns_parsed_notes_on_success(self, monkeypatch, tmp_path):
+        from src import generate_notes
+
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        prompt_file = tmp_path / "sermon.md"
+        prompt_file.write_text("Prompt text")
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+
+        uploaded = Mock(name="uploaded-file")
+        response = Mock()
+        response.text = _json.dumps({
+            "title": "Gods Genade | 1 Korintiërs 1:1-9 | Dennis",
+            "description": "Over de genade van God.",
+            "suggested_cut": {"start": "00:10:00", "end": "01:00:00"},
+        })
+
+        fake_client = Mock()
+        fake_client.files.upload.return_value = uploaded
+        fake_client.models.generate_content.return_value = response
+        monkeypatch.setattr(generate_notes, "_build_client", lambda: fake_client)
+
+        blob = self._blob()
+        result = generate_notes.generate_notes(blob)
+
+        assert result.title.startswith("Gods Genade")
+        assert result.description == "Over de genade van God."
+        assert result.suggested_cut == SuggestedCut(start="00:10:00", end="01:00:00")
+        fake_client.files.delete.assert_called_once_with(name=uploaded.name)
+
+    def test_returns_empty_on_api_exception(self, monkeypatch, tmp_path):
+        from src import generate_notes
+
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        prompt_file = tmp_path / "sermon.md"
+        prompt_file.write_text("Prompt text")
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+
+        fake_client = Mock()
+        fake_client.files.upload.side_effect = RuntimeError("boom")
+        monkeypatch.setattr(generate_notes, "_build_client", lambda: fake_client)
+
+        blob = self._blob()
+        result = generate_notes.generate_notes(blob)
+
+        assert result == Notes.empty()
+
+    def test_returns_empty_on_malformed_response(self, monkeypatch, tmp_path):
+        from src import generate_notes
+
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        prompt_file = tmp_path / "sermon.md"
+        prompt_file.write_text("Prompt text")
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+
+        response = Mock()
+        response.text = "not-json"
+
+        fake_client = Mock()
+        fake_client.files.upload.return_value = Mock(name="uploaded")
+        fake_client.models.generate_content.return_value = response
+        monkeypatch.setattr(generate_notes, "_build_client", lambda: fake_client)
+
+        blob = self._blob()
+        result = generate_notes.generate_notes(blob)
+
+        assert result == Notes.empty()
+
+    def test_returns_empty_with_null_fields_pass_through(self, monkeypatch, tmp_path):
+        from src import generate_notes
+
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        prompt_file = tmp_path / "sermon.md"
+        prompt_file.write_text("Prompt text")
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+
+        response = Mock()
+        response.text = _json.dumps({
+            "title": None,
+            "description": None,
+            "suggested_cut": None,
+        })
+
+        fake_client = Mock()
+        fake_client.files.upload.return_value = Mock(name="uploaded")
+        fake_client.models.generate_content.return_value = response
+        monkeypatch.setattr(generate_notes, "_build_client", lambda: fake_client)
+
+        blob = self._blob()
+        result = generate_notes.generate_notes(blob)
+
+        assert result == Notes.empty()
