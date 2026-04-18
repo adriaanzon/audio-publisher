@@ -37,7 +37,9 @@ class Recording:
         }
 
 
-def list_bucket_files(bucket: storage.Bucket) -> tuple[dict[str, storage.Blob], dict[str, storage.Blob]]:
+def list_bucket_files(
+    bucket: storage.Bucket,
+) -> tuple[dict[str, storage.Blob], dict[str, storage.Blob]]:
     blobs = list(bucket.list_blobs())
     mp3_files = {b.name: b for b in blobs if b.name.endswith(".mp3")}
     json_files = {
@@ -45,7 +47,9 @@ def list_bucket_files(bucket: storage.Bucket) -> tuple[dict[str, storage.Blob], 
     }
     logger.info(
         "Found %d MP3 files and %d JSON files in gs://%s",
-        len(mp3_files), len(json_files), bucket.name,
+        len(mp3_files),
+        len(json_files),
+        bucket.name,
     )
     return mp3_files, json_files
 
@@ -66,19 +70,21 @@ def build_recordings(
     recordings: list[Recording] = []
 
     for json_name, json_blob in json_files.items():
-        base = json_name[:-len(".json")]
+        base = json_name[: -len(".json")]
         mp3_name = f"{base}.mp3"
         mp3_blob = mp3_files.get(mp3_name)
         payload = _parse_json_payload(json_blob)
         status = payload.get("status", "processing")
 
         if status == "ready" and mp3_blob is None:
-            logger.warning("JSON %s is ready but %s is missing — skipping", json_name, mp3_name)
+            logger.warning(
+                "JSON %s is ready but %s is missing — skipping", json_name, mp3_name
+            )
             continue
 
         recording = Recording(
             name=mp3_name,
-            updated=json_blob.updated.isoformat(),
+            updated=json_blob.updated.isoformat() if json_blob.updated else "",
             status=status,
             error_code=payload.get("error_code"),
             title=payload.get("title"),
@@ -87,12 +93,17 @@ def build_recordings(
         )
         if mp3_blob is not None:
             recording.url = mp3_blob.public_url
-            recording.size = naturalsize(mp3_blob.size)
+            if mp3_blob.size is not None:
+                recording.size = naturalsize(mp3_blob.size)
         recordings.append(recording)
 
-    orphan_mp3s = [name for name in mp3_files if name.replace(".mp3", ".json") not in json_files]
+    orphan_mp3s = [
+        name for name in mp3_files if name.replace(".mp3", ".json") not in json_files
+    ]
     for name in orphan_mp3s:
-        logger.warning("MP3 %s has no paired JSON — skipping (see Migration in the spec)", name)
+        logger.warning(
+            "MP3 %s has no paired JSON — skipping (see Migration in the spec)", name
+        )
 
     recordings.sort(key=lambda r: r.updated, reverse=True)
     return recordings

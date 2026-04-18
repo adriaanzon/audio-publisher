@@ -25,7 +25,12 @@ class TestDestinationMp3Routing:
 
         importlib.reload(main)  # pick up env vars
 
-        ready_payload = {"status": "ready", "title": "t", "description": "d", "suggested_cut": None}
+        ready_payload = {
+            "status": "ready",
+            "title": "t",
+            "description": "d",
+            "suggested_cut": None,
+        }
         ready_blob = Mock()
         ready_blob.exists.return_value = True
         ready_blob.download_as_text.return_value = json.dumps(ready_payload)
@@ -58,12 +63,16 @@ class TestDestinationMp3Routing:
 
         processing_blob = Mock()
         processing_blob.exists.return_value = True
-        processing_blob.download_as_text.return_value = json.dumps({"status": "processing"})
+        processing_blob.download_as_text.return_value = json.dumps(
+            {"status": "processing"}
+        )
         mp3_blob = Mock()
         mp3_blob.size = 50_000_000
 
         bucket = Mock()
-        bucket.blob.side_effect = lambda name: processing_blob if name.endswith(".json") else mp3_blob
+        bucket.blob.side_effect = lambda name: (
+            processing_blob if name.endswith(".json") else mp3_blob
+        )
         client = Mock()
         client.bucket.return_value = bucket
 
@@ -97,7 +106,9 @@ class TestDestinationMp3Routing:
         mp3_blob.size = 50_000_000
 
         bucket = Mock()
-        bucket.blob.side_effect = lambda name: missing_json_blob if name.endswith(".json") else mp3_blob
+        bucket.blob.side_effect = lambda name: (
+            missing_json_blob if name.endswith(".json") else mp3_blob
+        )
         client = Mock()
         client.bucket.return_value = bucket
 

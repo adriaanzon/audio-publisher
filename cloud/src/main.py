@@ -32,7 +32,7 @@ def _json_status(bucket: storage.Bucket, base_name: str) -> str | None:
 def handle_destination_mp3(object_name: str) -> None:
     """Run notes generation when a destination-bucket MP3 isn't already `ready`,
     then always regenerate the listing."""
-    base_name = object_name[:-len(".mp3")]
+    base_name = object_name[: -len(".mp3")]
     client = _storage_client()
     bucket = client.bucket(DESTINATION_BUCKET)
 
@@ -49,7 +49,7 @@ def handle_destination_mp3(object_name: str) -> None:
 
 @app.route("/", methods=["POST"])
 def handle_event():
-    event = from_http(request.headers, request.get_data())
+    event = from_http(dict(request.headers), request.get_data())
     print(f"Received event: {event['type']}")
     print(f"Event data: {event.data}")
 

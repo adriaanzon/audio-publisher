@@ -37,7 +37,9 @@ class TestBuildRecordings:
             },
             updated=datetime(2026, 4, 7, 10, 0, 0),
         )
-        mp3_b = _mp3_blob("R_1.mp3", 12_300_000, datetime(2026, 4, 7, 9, 55, 0), "https://e/R_1.mp3")
+        mp3_b = _mp3_blob(
+            "R_1.mp3", 12_300_000, datetime(2026, 4, 7, 9, 55, 0), "https://e/R_1.mp3"
+        )
 
         result = build_recordings({"R_1.json": json_b}, {"R_1.mp3": mp3_b})
 
@@ -51,7 +53,9 @@ class TestBuildRecordings:
         assert r.suggested_cut == {"start": "00:10:00", "end": "00:55:00"}
 
     def test_processing_json_without_mp3(self):
-        json_b = _json_blob("R_1.json", {"status": "processing"}, datetime(2026, 4, 7, 10, 0, 0))
+        json_b = _json_blob(
+            "R_1.json", {"status": "processing"}, datetime(2026, 4, 7, 10, 0, 0)
+        )
 
         result = build_recordings({"R_1.json": json_b}, {})
 
@@ -73,7 +77,9 @@ class TestBuildRecordings:
         assert result[0].error_code == "zero_byte_file"
 
     def test_orphan_mp3_is_skipped(self):
-        mp3_b = _mp3_blob("R_1.mp3", 1, datetime(2026, 4, 7, 10, 0, 0), "https://e/R_1.mp3")
+        mp3_b = _mp3_blob(
+            "R_1.mp3", 1, datetime(2026, 4, 7, 10, 0, 0), "https://e/R_1.mp3"
+        )
 
         result = build_recordings({}, {"R_1.mp3": mp3_b})
 
@@ -83,7 +89,12 @@ class TestBuildRecordings:
         """Edge case: JSON says ready but the MP3 blob vanished. Treat as inconsistent, skip."""
         json_b = _json_blob(
             "R_1.json",
-            {"status": "ready", "title": "t", "description": "d", "suggested_cut": None},
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
             datetime(2026, 4, 7, 10, 0, 0),
         )
 
@@ -94,16 +105,30 @@ class TestBuildRecordings:
     def test_sorted_by_updated_desc(self):
         older = _json_blob(
             "R_old.json",
-            {"status": "ready", "title": "t", "description": "d", "suggested_cut": None},
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
             updated=datetime(2026, 4, 1, 10, 0, 0),
         )
         newer = _json_blob(
             "R_new.json",
-            {"status": "ready", "title": "t", "description": "d", "suggested_cut": None},
+            {
+                "status": "ready",
+                "title": "t",
+                "description": "d",
+                "suggested_cut": None,
+            },
             updated=datetime(2026, 4, 7, 10, 0, 0),
         )
-        old_mp3 = _mp3_blob("R_old.mp3", 1, datetime(2026, 4, 1, 9, 59), "https://e/old")
-        new_mp3 = _mp3_blob("R_new.mp3", 1, datetime(2026, 4, 7, 9, 59), "https://e/new")
+        old_mp3 = _mp3_blob(
+            "R_old.mp3", 1, datetime(2026, 4, 1, 9, 59), "https://e/old"
+        )
+        new_mp3 = _mp3_blob(
+            "R_new.mp3", 1, datetime(2026, 4, 7, 9, 59), "https://e/new"
+        )
 
         result = build_recordings(
             {"R_old.json": older, "R_new.json": newer},

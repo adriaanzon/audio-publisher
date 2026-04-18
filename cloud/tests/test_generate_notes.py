@@ -117,11 +117,13 @@ class TestGenerateNotes:
 
         uploaded = Mock(name="uploaded-file")
         response = Mock()
-        response.text = _json.dumps({
-            "title": "Gods Genade | 1 Korintiërs 1:1-9 | Dennis",
-            "description": "Over de genade van God.",
-            "suggested_cut": {"start": "00:10:00", "end": "01:00:00"},
-        })
+        response.text = _json.dumps(
+            {
+                "title": "Gods Genade | 1 Korintiërs 1:1-9 | Dennis",
+                "description": "Over de genade van God.",
+                "suggested_cut": {"start": "00:10:00", "end": "01:00:00"},
+            }
+        )
 
         fake_client = Mock()
         fake_client.files.upload.return_value = uploaded
@@ -183,11 +185,13 @@ class TestGenerateNotes:
         monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
 
         response = Mock()
-        response.text = _json.dumps({
-            "title": None,
-            "description": None,
-            "suggested_cut": None,
-        })
+        response.text = _json.dumps(
+            {
+                "title": None,
+                "description": None,
+                "suggested_cut": None,
+            }
+        )
 
         fake_client = Mock()
         fake_client.files.upload.return_value = Mock(name="uploaded")

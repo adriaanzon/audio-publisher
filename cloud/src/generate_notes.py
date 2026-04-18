@@ -81,9 +81,7 @@ def _parse_notes(raw: str) -> Notes:
     data = json.loads(raw)
     cut_data = data.get("suggested_cut")
     cut = (
-        SuggestedCut(start=cut_data["start"], end=cut_data["end"])
-        if cut_data
-        else None
+        SuggestedCut(start=cut_data["start"], end=cut_data["end"]) if cut_data else None
     )
     return Notes(
         title=data.get("title"),
@@ -123,12 +121,14 @@ def generate_notes(mp3_blob: storage.Blob) -> Notes:
                 response_schema=RESPONSE_SCHEMA,
             ),
         )
+        if response.text is None:
+            raise ValueError("Gemini returned no text")
         return _parse_notes(response.text)
     except Exception:
         logger.exception("Notes generation failed for %s", mp3_blob.name)
         return Notes.empty()
     finally:
-        if uploaded is not None:
+        if uploaded is not None and uploaded.name is not None:
             try:
                 _build_client().files.delete(name=uploaded.name)
             except Exception:
