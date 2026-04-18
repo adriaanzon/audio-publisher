@@ -45,3 +45,14 @@ Match the voice and length of these examples:
   Description: Paulus geeft Timoteüs meerdere opdrachten. John Doe zoomt
   in op twee van deze opdrachten. Hij vertelt ook wat dit te maken heeft
   met de audiobijbels die hij samen met anderen in Oeganda verspreidt.
+
+- Title: `Bidden als een slaaf | Handelingen 4`
+  Description: Bidden als slaven, dat klinkt misschien niet zo positief
+  in je oren, maar het is een inzicht vanuit Gods woord. We lezen
+  Handelingen 4:23-31.
+
+The last example has no speaker component because no preacher was
+clearly named in the audio — the ` | <speaker>` part is omitted
+entirely, not filled with a placeholder. It also shows the "We lezen
+..." pattern, which is a natural closing when a specific passage is
+read.
