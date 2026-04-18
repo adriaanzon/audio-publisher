@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Recordings</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: system-ui, sans-serif;
             min-height: 100vh;
@@ -17,21 +13,9 @@
             padding: 60px 20px;
             -webkit-font-smoothing: antialiased;
         }
-        .container {
-            max-width: 980px;
-            margin: 0 auto;
-        }
-        header {
-            margin-bottom: 48px;
-            text-align: center;
-        }
-        h1 {
-            color: #1d1d1f;
-            font-size: 3em;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
-        }
+        .container { max-width: 980px; margin: 0 auto; }
+        header { margin-bottom: 48px; text-align: center; }
+        h1 { color: #1d1d1f; font-size: 3em; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
         .recordings {
             background: rgba(255, 255, 255, 0.8);
             border-radius: 18px;
@@ -39,242 +23,125 @@
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
             overflow: hidden;
         }
-        .recording {
-            padding: 24px;
-            border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 16px 24px;
-        }
-        .recording:last-child {
-            border-bottom: none;
-        }
-        .recording:hover {
-            background: rgba(0, 0, 0, 0.02);
-        }
-        .recording-header {
+        details.recording { border-bottom: 0.5px solid rgba(0, 0, 0, 0.08); }
+        details.recording:last-child { border-bottom: none; }
+        details.recording > summary {
+            padding: 20px 24px;
+            cursor: pointer;
+            list-style: none;
             display: flex;
             gap: 16px;
             align-items: baseline;
             flex-wrap: wrap;
-            flex: 1;
-            min-width: 0;
         }
-        .recording-name {
-            font-weight: 600;
-            font-size: 1.0625em;
-            color: #1d1d1f;
-            text-decoration: none;
-            letter-spacing: -0.01em;
+        details.recording > summary::-webkit-details-marker { display: none; }
+        details.recording[open] > summary { border-bottom: 0.5px solid rgba(0, 0, 0, 0.05); }
+        .summary-title { font-weight: 600; color: #1d1d1f; font-size: 1.0625em; letter-spacing: -0.01em; flex: 1; min-width: 0; }
+        .summary-date { color: #86868b; font-size: 0.9375em; }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 12px;
+            font-size: 0.8125em; font-weight: 500; letter-spacing: 0.01em;
         }
-        .recording-name:hover {
-            color: #6b4ce6;
-        }
-        .recording-info {
-            color: #86868b;
-            font-size: 0.9375em;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        audio {
-            height: 40px;
-            margin-left: auto;
-        }
+        .status-processing { background: rgba(255, 149, 0, 0.1); color: #ff9500; }
+        .status-error { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+        .recording-body { padding: 8px 24px 24px; }
+        .description { color: #424245; font-size: 0.9375em; line-height: 1.5; margin-bottom: 12px; }
+        .metadata-row { color: #86868b; font-size: 0.875em; display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
+        .audio-row { display: flex; gap: 16px; align-items: center; margin-top: 12px; }
+        audio { height: 40px; flex: 1; min-width: 0; }
         .download-btn {
-            width: 40px;
-            height: 40px;
-            background: #6b4ce6;
-            color: white;
-            text-decoration: none;
-            border-radius: 50%;
+            width: 40px; height: 40px;
+            background: #6b4ce6; color: white;
+            text-decoration: none; border-radius: 50%;
             font-size: 1.25em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             transition: background 0.3s ease;
             flex-shrink: 0;
         }
-        .download-btn:hover {
-            background: #5a3dd5;
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.8125em;
-            font-weight: 500;
-            letter-spacing: 0.01em;
-        }
-        .status-processing {
-            background: rgba(255, 149, 0, 0.1);
-            color: #ff9500;
-        }
-        .status-error {
-            background: rgba(255, 59, 48, 0.1);
-            color: #ff3b30;
-        }
-        .recording.processing {
-            opacity: 0.7;
-        }
-        .recording.processing .recording-name {
-            cursor: default;
-            pointer-events: none;
-        }
-        .recording.error .recording-name {
-            cursor: default;
-            pointer-events: none;
-        }
-        .error-message {
-            flex-basis: 100%;
-            color: #ff3b30;
-            font-size: 0.9375em;
-            line-height: 1.5;
-            margin-top: 8px;
-        }
-        .error-message a {
-            color: #6b4ce6;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .error-message a:hover {
-            text-decoration: underline;
-        }
-        .empty-state {
-            padding: 80px 20px;
-            text-align: center;
-            color: #86868b;
-            font-size: 1.125em;
-        }
-        footer {
-            margin-top: 32px;
-            text-align: center;
-            color: #86868b;
-            font-size: 0.875em;
-        }
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2.25em;
-            }
-            .recording-header {
-                flex-basis: 100%;
-            }
-            audio {
-                margin-left: 0;
-                flex: 1;
-                min-width: 0;
-            }
-        }
+        .download-btn:hover { background: #5a3dd5; }
+        .error-message { color: #ff3b30; font-size: 0.9375em; line-height: 1.5; }
+        .error-message a { color: #6b4ce6; text-decoration: none; font-weight: 500; }
+        .error-message a:hover { text-decoration: underline; }
+        .empty-state { padding: 80px 20px; text-align: center; color: #86868b; font-size: 1.125em; }
+        footer { margin-top: 32px; text-align: center; color: #86868b; font-size: 0.875em; }
         @media (prefers-color-scheme: dark) {
-            body {
-                background: #000;
-            }
-            h1 {
-                color: #f5f5f7;
-            }
-            .recordings {
-                background: rgba(29, 29, 31, 0.7);
-                border: 0.5px solid rgba(255, 255, 255, 0.1);
-            }
-            .recording {
-                border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
-            }
-            .recording:hover {
-                background: rgba(255, 255, 255, 0.05);
-            }
-            .recording-name {
-                color: #f5f5f7;
-            }
-            .recording-name:hover {
-                color: #8b6ff0;
-            }
-            .recording-info {
-                color: #a1a1a6;
-            }
-            .empty-state {
-                color: #a1a1a6;
-            }
-            footer {
-                color: #a1a1a6;
-            }
-            .status-processing {
-                background: rgba(255, 149, 0, 0.2);
-            }
-            .status-error {
-                background: rgba(255, 59, 48, 0.2);
-            }
-            .error-message {
-                color: #ff453a;
-            }
-            .error-message a {
-                color: #8b6ff0;
-            }
+            body { background: #000; }
+            h1 { color: #f5f5f7; }
+            .recordings { background: rgba(29, 29, 31, 0.7); border: 0.5px solid rgba(255, 255, 255, 0.1); }
+            details.recording { border-bottom: 0.5px solid rgba(255, 255, 255, 0.1); }
+            .summary-title { color: #f5f5f7; }
+            .summary-date { color: #a1a1a6; }
+            .description { color: #d2d2d7; }
+            .metadata-row { color: #a1a1a6; }
+            .empty-state { color: #a1a1a6; }
+            footer { color: #a1a1a6; }
+            .status-processing { background: rgba(255, 149, 0, 0.2); }
+            .status-error { background: rgba(255, 59, 48, 0.2); }
+            .error-message { color: #ff453a; }
+            .error-message a { color: #8b6ff0; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🎙️ Audio Recordings</h1>
-        </header>
+        <header><h1>🎙️ Audio Recordings</h1></header>
 
         <div class="recordings">
             {% if recordings %}
                 {% for recording in recordings %}
-                <div class="recording {% if recording.status == 'processing' %}processing{% elif recording.status == 'error' %}error{% endif %}">
-                    <div class="recording-header">
-                        {% if recording.status == 'ready' %}
-                        <a href="{{ recording.url }}" class="recording-name">{{ recording.name }}</a>
-                        {% else %}
-                        <span class="recording-name">{{ recording.name }}</span>
+                <details class="recording">
+                    <summary>
+                        <span class="summary-title">{{ recording.title or recording.name }}</span>
+                        <span class="summary-date timestamp">{{ recording.updated }}</span>
+                        {% if recording.status == 'processing' %}
+                        <span class="status-badge status-processing">Processing</span>
+                        {% elif recording.status == 'error' %}
+                        <span class="status-badge status-error">Error</span>
                         {% endif %}
-                        <div class="recording-info">
-                            {% if recording.status == 'ready' %}
-                            <span>{{ recording.size }}</span>
-                            <span>•</span>
+                    </summary>
+                    <div class="recording-body">
+                        {% if recording.description %}
+                        <p class="description">{{ recording.description }}</p>
+                        {% endif %}
+
+                        <div class="metadata-row">
+                            {% if recording.title %}
+                            <span>Filename: {{ recording.name }}</span>
                             {% endif %}
-                            <span class="timestamp">{{ recording.updated }}</span>
+                            {% if recording.size %}
+                            <span>{{ recording.size }}</span>
+                            {% endif %}
+                            {% if recording.suggested_cut %}
+                            <span>Suggested cut: {{ recording.suggested_cut.start }} – {{ recording.suggested_cut.end }}</span>
+                            {% endif %}
                         </div>
+
+                        {% if recording.status == 'ready' %}
+                        <div class="audio-row">
+                            <audio controls preload="none">
+                                <source src="{{ recording.url }}" type="audio/mpeg">
+                                Your browser does not support the audio element.
+                            </audio>
+                            <a href="{{ recording.url }}" download="{{ recording.name }}" class="download-btn" aria-label="Download">↓</a>
+                        </div>
+                        {% elif recording.status == 'error' and recording.error_code == 'zero_byte_file' %}
+                        <div class="error-message">
+                            This recording file is corrupted (0 bytes). This typically happens when the USB drive is removed or the console is powered off before stopping the recording.
+                            <a href="https://www.youtube.com/watch?v=lw5zBkoWAg8" target="_blank" rel="noopener">Watch this video to learn how to recover the lost recording</a>.
+                        </div>
+                        {% endif %}
                     </div>
-                    {% if recording.status == 'ready' %}
-                    <audio controls preload="none">
-                        <source src="{{ recording.url }}" type="audio/mpeg">
-                        Your browser does not support the audio element.
-                    </audio>
-                    <a href="{{ recording.url }}" download="{{ recording.name }}" class="download-btn" aria-label="Download">↓</a>
-                    {% elif recording.status == 'error' %}
-                    <span class="status-badge status-error">
-                        Error
-                    </span>
-                    {% if recording.error_code == 'zero_byte_file' %}
-                    <div class="error-message">
-                        This recording file is corrupted (0 bytes). This typically happens when the USB drive is removed or the console is powered off before stopping the recording.
-                        <a href="https://www.youtube.com/watch?v=lw5zBkoWAg8" target="_blank" rel="noopener">Watch this video to learn how to recover the lost recording</a>.
-                    </div>
-                    {% endif %}
-                    {% else %}
-                    <span class="status-badge status-processing">
-                        Processing
-                    </span>
-                    {% endif %}
-                </div>
+                </details>
                 {% endfor %}
             {% else %}
-                <div class="empty-state">
-                    <p>No recordings available.</p>
-                </div>
+                <div class="empty-state"><p>No recordings available.</p></div>
             {% endif %}
         </div>
 
-        <footer>
-            Last updated: <span class="timestamp">{{ generation_time }}</span>
-        </footer>
+        <footer>Last updated: <span class="timestamp">{{ generation_time }}</span></footer>
     </div>
     <script>
-        // Format timestamps in browser's local timezone
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.timestamp').forEach(function(el) {
                 const isoDate = el.textContent.trim();
