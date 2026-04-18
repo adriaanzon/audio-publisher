@@ -23,8 +23,11 @@ Dutch title and show-notes description.
    what the speaker did or said.
 5. If the sermon is only part of the recording (preceded by worship,
    followed by announcements), set `suggested_cut` to
-   `{"start": "HH:MM:SS", "end": "HH:MM:SS"}` marking the sermon's
-   beginning and end in the original audio. Otherwise set it to null.
+   `{"start": <seconds>, "end": <seconds>}` with integer seconds
+   counted from the beginning of the recording. Example for a sermon
+   from 7 minutes 30 seconds until 48 minutes 12 seconds in:
+   `{"start": 450, "end": 2892}`. If the entire recording is the
+   sermon, set `suggested_cut` to null.
 6. Prefer null over guessing. When unsure about any field, return null.
 
 ## Style examples

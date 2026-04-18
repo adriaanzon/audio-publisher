@@ -8,16 +8,22 @@ from google.cloud import storage
 MAX_AUDIO_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 DEFAULT_PROMPT_FILE = "prompts/sermon.md"
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 @dataclass
 class SuggestedCut:
-    start: str
-    end: str
+    start: int  # seconds from start of recording
+    end: int
 
     def to_dict(self) -> dict:
-        return {"start": self.start, "end": self.end}
+        return {"start": _format_hms(self.start), "end": _format_hms(self.end)}
+
+
+def _format_hms(total_seconds: int) -> str:
+    h, rem = divmod(total_seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 @dataclass
@@ -60,8 +66,8 @@ RESPONSE_SCHEMA = {
             "type": "OBJECT",
             "nullable": True,
             "properties": {
-                "start": {"type": "STRING"},
-                "end": {"type": "STRING"},
+                "start": {"type": "INTEGER"},
+                "end": {"type": "INTEGER"},
             },
             "required": ["start", "end"],
         },
