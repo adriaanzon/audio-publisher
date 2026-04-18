@@ -8,7 +8,7 @@ from google.cloud import storage
 MAX_AUDIO_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 DEFAULT_PROMPT_FILE = "prompts/sermon.md"
-DEFAULT_MODEL = "gemini-2.5-flash"
+MODELS = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
 
 
 @dataclass
@@ -52,6 +52,7 @@ import tempfile
 from typing import Optional
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 logger = logging.getLogger(__name__)
@@ -120,14 +121,25 @@ def generate_notes(mp3_blob: storage.Blob) -> Notes:
             tmp.flush()
             uploaded = client.files.upload(file=tmp.name)
 
-        response = client.models.generate_content(
-            model=DEFAULT_MODEL,
-            contents=[uploaded, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=RESPONSE_SCHEMA,
-            ),
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=RESPONSE_SCHEMA,
         )
+        response = None
+        for model in MODELS:
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[uploaded, prompt],
+                    config=config,
+                )
+                break
+            except genai_errors.ServerError:
+                logger.warning(
+                    "Gemini %s unavailable, trying next model", model, exc_info=True
+                )
+        if response is None:
+            raise RuntimeError("All Gemini models unavailable")
         if response.text is None:
             raise ValueError("Gemini returned no text")
         return _parse_notes(response.text)

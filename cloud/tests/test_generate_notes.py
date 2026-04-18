@@ -176,6 +176,43 @@ class TestGenerateNotes:
 
         assert result == Notes.empty()
 
+    def test_falls_back_to_next_model_on_server_error(self, monkeypatch, tmp_path):
+        from google.genai import errors as genai_errors
+
+        from src import generate_notes
+
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        prompt_file = tmp_path / "sermon.md"
+        prompt_file.write_text("Prompt text")
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+
+        response = Mock()
+        response.text = _json.dumps(
+            {
+                "title": "Fallback title",
+                "description": "Fallback description.",
+                "suggested_cut": None,
+            }
+        )
+
+        server_error = genai_errors.ServerError(
+            503, {"error": {"message": "unavailable"}}
+        )
+        fake_client = Mock()
+        fake_client.files.upload.return_value = Mock(name="uploaded")
+        fake_client.models.generate_content.side_effect = [server_error, response]
+        monkeypatch.setattr(generate_notes, "_build_client", lambda: fake_client)
+
+        result = generate_notes.generate_notes(self._blob())
+
+        assert result.title == "Fallback title"
+        assert fake_client.models.generate_content.call_count == 2
+        models_called = [
+            call.kwargs["model"]
+            for call in fake_client.models.generate_content.call_args_list
+        ]
+        assert models_called == list(generate_notes.MODELS)
+
     def test_returns_empty_with_null_fields_pass_through(self, monkeypatch, tmp_path):
         from src import generate_notes
 
