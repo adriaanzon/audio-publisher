@@ -111,18 +111,15 @@ def normalize_audio_file(source_path: Path, output_path: Path):
 
 
 def upload_result_and_cleanup(job: ProcessingJob, output_path: Path, storage_client: storage.Client):
-    """Upload the normalized MP3 and delete temporary files."""
+    """Upload the normalized MP3 and delete the source WAV. The processing placeholder
+    is intentionally left in place — main.py's MP3 handler overwrites it with the
+    final `ready` JSON after notes generation."""
     bucket = storage_client.bucket(job.destination_bucket)
 
     # Upload MP3
     output_blob = bucket.blob(job.output_filename)
     print(f"Uploading {output_path} to gs://{job.destination_bucket}/{job.output_filename}")
     output_blob.upload_from_filename(output_path)
-
-    # Delete placeholder
-    placeholder_blob = bucket.blob(job.placeholder_filename)
-    print(f"Deleting placeholder: gs://{job.destination_bucket}/{job.placeholder_filename}")
-    placeholder_blob.delete()
 
     # Delete source WAV
     source_bucket = storage_client.bucket(job.source_bucket)
