@@ -47,3 +47,26 @@ class TestIsAudioTooLarge:
         blob = Mock()
         blob.size = 50 * 1024 * 1024
         assert is_audio_too_large(blob) is False
+
+
+class TestLoadPrompt:
+    def test_reads_file_contents(self, tmp_path, monkeypatch):
+        from src.generate_notes import load_prompt
+
+        prompt_file = tmp_path / "my_prompt.md"
+        prompt_file.write_text("Be concise.")
+
+        monkeypatch.setenv("PROMPT_FILE", str(prompt_file))
+        assert load_prompt() == "Be concise."
+
+    def test_default_path_used_when_env_unset(self, tmp_path, monkeypatch):
+        from src.generate_notes import load_prompt
+
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "sermon.md").write_text("Default prompt.")
+
+        monkeypatch.delenv("PROMPT_FILE", raising=False)
+        monkeypatch.chdir(tmp_path)
+
+        assert load_prompt() == "Default prompt."

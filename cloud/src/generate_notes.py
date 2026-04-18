@@ -32,3 +32,8 @@ class Notes:
 
 def is_audio_too_large(blob: storage.Blob) -> bool:
     return blob.size is not None and blob.size > MAX_AUDIO_SIZE_BYTES
+
+
+def load_prompt() -> str:
+    path = os.environ.get("PROMPT_FILE", DEFAULT_PROMPT_FILE)
+    return Path(path).read_text()
