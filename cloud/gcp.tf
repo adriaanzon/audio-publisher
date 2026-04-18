@@ -36,6 +36,12 @@ variable "docker_image" {
   default     = "docker.io/adriaanzon/audio-publisher:latest"
 }
 
+variable "gemini_api_key" {
+  description = "Gemini Developer API key for AI-generated notes"
+  type        = string
+  sensitive   = true
+}
+
 provider "google" {
   project     = var.gcp_project
   region      = var.gcp_region
@@ -48,6 +54,7 @@ resource "google_project_service" "enable_apis" {
     "run.googleapis.com",
     "storage.googleapis.com",
     "iam.googleapis.com",
+    "secretmanager.googleapis.com",
   ])
 
   project = var.gcp_project
@@ -104,6 +111,32 @@ resource "google_project_iam_member" "gcs_pubsub_publishing" {
   member  = "serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"
 }
 
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "gemini-api-key"
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.enable_apis]
+}
+
+resource "google_secret_manager_secret_version" "gemini_api_key" {
+  secret      = google_secret_manager_secret.gemini_api_key.id
+  secret_data = var.gemini_api_key
+}
+
+# Cloud Run uses the default compute service account unless otherwise configured.
+# Grant it access to read the secret.
+data "google_project" "current" {
+  project_id = var.gcp_project
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # Image is built and pushed to GHCR by the GitHub Actions release workflow
 resource "google_cloud_run_v2_service" "default" {
   name     = "terminus"
@@ -131,8 +164,25 @@ resource "google_cloud_run_v2_service" "default" {
         name  = "DESTINATION_BUCKET"
         value = google_storage_bucket.destination.name
       }
+
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "PROMPT_FILE"
+        value = "prompts/sermon.md"
+      }
     }
   }
+
+  depends_on = [google_secret_manager_secret_iam_member.cloud_run_access]
 }
 
 # Create Eventarc triggers, routing Cloud Storage events to Cloud Run

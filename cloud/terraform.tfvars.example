@@ -3,3 +3,7 @@ gcp_region = "europe-west1"
 gcp_bucket_location = "EU"
 gcp_bucket_prefix = "my-project-recordings"
 docker_image = "docker.io/adriaanzon/audio-publisher:latest"
+
+# Gemini Developer API key (https://aistudio.google.com/app/apikey)
+# Kept out of version control in real use; stored in Google Secret Manager by Terraform.
+gemini_api_key = "REPLACE_ME"
