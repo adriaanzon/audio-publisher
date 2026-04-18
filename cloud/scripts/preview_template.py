@@ -2,16 +2,18 @@
 This script is used to preview the file listing template while developing.
 
 Usage:
-    uv run preview_template.py
+    uv run scripts/preview_template.py
 
 Then open http://localhost:5000 in your browser.
 """
 
 from datetime import datetime
+from pathlib import Path
 
 from flask import Flask, render_template
 
-app = Flask(__name__, template_folder="src/templates")
+TEMPLATES = Path(__file__).resolve().parent.parent / "src" / "templates"
+app = Flask(__name__, template_folder=str(TEMPLATES))
 
 
 @app.route("/")

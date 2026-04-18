@@ -64,7 +64,7 @@ To preview the audio file listing locally, you can use the following command:
 
 ```bash
 cd cloud
-uv run preview_template.py
+uv run scripts/preview_template.py
 ```
 
 ### Infrastructure (Terraform)
