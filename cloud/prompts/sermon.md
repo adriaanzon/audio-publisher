@@ -22,12 +22,18 @@ Dutch title and show-notes description.
    Focus on the subject and the questions the sermon explores — not on
    what the speaker did or said.
 5. If the sermon is only part of the recording (preceded by worship,
-   followed by announcements), set `suggested_cut` to
-   `{"start": <seconds>, "end": <seconds>}` with integer seconds
-   counted from the beginning of the recording. Example for a sermon
-   from 7 minutes 30 seconds until 48 minutes 12 seconds in:
-   `{"start": 450, "end": 2892}`. If the entire recording is the
-   sermon, set `suggested_cut` to null.
+   followed by announcements), set `suggested_cut`:
+   - `start` / `end`: timestamps in `MM:SS` format counted from the
+     start of the recording.
+   - `start_phrase` / `end_phrase`: the exact Dutch words spoken at
+     those timestamps. Pick the timestamps so these phrases mark the
+     first and last words of the sermon itself (not the worship closing
+     or post-sermon announcements).
+
+   Example: `{"start": "07:30", "start_phrase": "Goedemorgen allemaal,
+   fijn dat jullie er zijn", "end": "48:12", "end_phrase": "in Jezus'
+   naam, amen"}`. If the entire recording is the sermon, set
+   `suggested_cut` to null.
 6. Prefer null over guessing. When unsure about any field, return null.
 
 ## Style examples

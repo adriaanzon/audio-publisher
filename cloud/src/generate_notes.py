@@ -8,22 +8,23 @@ from google.cloud import storage
 MAX_AUDIO_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 DEFAULT_PROMPT_FILE = "prompts/sermon.md"
-MODELS = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
+MODELS = ("gemini-3-flash-preview", "gemini-2.5-flash")
 
 
 @dataclass
 class SuggestedCut:
-    start: int  # seconds from start of recording
-    end: int
+    start: str  # MM:SS; minutes may exceed 60
+    start_phrase: str
+    end: str
+    end_phrase: str
 
     def to_dict(self) -> dict:
-        return {"start": _format_hms(self.start), "end": _format_hms(self.end)}
-
-
-def _format_hms(total_seconds: int) -> str:
-    h, rem = divmod(total_seconds, 3600)
-    m, s = divmod(rem, 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
+        return {
+            "start": self.start,
+            "start_phrase": self.start_phrase,
+            "end": self.end,
+            "end_phrase": self.end_phrase,
+        }
 
 
 @dataclass
@@ -67,10 +68,12 @@ RESPONSE_SCHEMA = {
             "type": "OBJECT",
             "nullable": True,
             "properties": {
-                "start": {"type": "INTEGER"},
-                "end": {"type": "INTEGER"},
+                "start": {"type": "STRING"},
+                "start_phrase": {"type": "STRING"},
+                "end": {"type": "STRING"},
+                "end_phrase": {"type": "STRING"},
             },
-            "required": ["start", "end"],
+            "required": ["start", "start_phrase", "end", "end_phrase"],
         },
     },
     "required": ["title", "description", "suggested_cut"],
@@ -88,7 +91,14 @@ def _parse_notes(raw: str) -> Notes:
     data = json.loads(raw)
     cut_data = data.get("suggested_cut")
     cut = (
-        SuggestedCut(start=cut_data["start"], end=cut_data["end"]) if cut_data else None
+        SuggestedCut(
+            start=cut_data["start"],
+            start_phrase=cut_data["start_phrase"],
+            end=cut_data["end"],
+            end_phrase=cut_data["end_phrase"],
+        )
+        if cut_data
+        else None
     )
     return Notes(
         title=data.get("title"),

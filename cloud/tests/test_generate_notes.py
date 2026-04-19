@@ -10,8 +10,15 @@ from src.generate_notes import (
 
 class TestSuggestedCut:
     def test_to_dict(self):
-        cut = SuggestedCut(start=300, end=2730)
-        assert cut.to_dict() == {"start": "00:05:00", "end": "00:45:30"}
+        cut = SuggestedCut(
+            start="05:00", start_phrase="Goedemorgen", end="45:30", end_phrase="amen"
+        )
+        assert cut.to_dict() == {
+            "start": "05:00",
+            "start_phrase": "Goedemorgen",
+            "end": "45:30",
+            "end_phrase": "amen",
+        }
 
 
 class TestNotes:
@@ -22,14 +29,16 @@ class TestNotes:
         assert notes.suggested_cut is None
 
     def test_with_values(self):
-        cut = SuggestedCut(start=600, end=3600)
+        cut = SuggestedCut(
+            start="10:00", start_phrase="Goedemorgen", end="60:00", end_phrase="amen"
+        )
         notes = Notes(
             title="Gods Genade | 1 Korintiërs 1:1-9",
             description="Over de genade van God.",
             suggested_cut=cut,
         )
         assert notes.title.startswith("Gods Genade")
-        assert notes.suggested_cut.start == 600
+        assert notes.suggested_cut.start == "10:00"
 
 
 class TestIsAudioTooLarge:
@@ -121,7 +130,12 @@ class TestGenerateNotes:
             {
                 "title": "Gods Genade | 1 Korintiërs 1:1-9 | Dennis",
                 "description": "Over de genade van God.",
-                "suggested_cut": {"start": 600, "end": 3600},
+                "suggested_cut": {
+                    "start": "10:00",
+                    "start_phrase": "Goedemorgen",
+                    "end": "60:00",
+                    "end_phrase": "amen",
+                },
             }
         )
 
@@ -135,7 +149,9 @@ class TestGenerateNotes:
 
         assert result.title.startswith("Gods Genade")
         assert result.description == "Over de genade van God."
-        assert result.suggested_cut == SuggestedCut(start=600, end=3600)
+        assert result.suggested_cut == SuggestedCut(
+            start="10:00", start_phrase="Goedemorgen", end="60:00", end_phrase="amen"
+        )
         fake_client.files.delete.assert_called_once_with(name=uploaded.name)
 
     def test_returns_empty_on_api_exception(self, monkeypatch, tmp_path):
@@ -252,7 +268,12 @@ class TestWriteReadyJson:
         notes = Notes(
             title="T | ref | speaker",
             description="desc",
-            suggested_cut=SuggestedCut(start=300, end=2700),
+            suggested_cut=SuggestedCut(
+                start="05:00",
+                start_phrase="Goedemorgen",
+                end="45:00",
+                end_phrase="amen",
+            ),
         )
         write_ready_json(bucket, "R_20260418-120000", notes)
 
@@ -263,7 +284,12 @@ class TestWriteReadyJson:
         assert payload["status"] == "ready"
         assert payload["title"] == "T | ref | speaker"
         assert payload["description"] == "desc"
-        assert payload["suggested_cut"] == {"start": "00:05:00", "end": "00:45:00"}
+        assert payload["suggested_cut"] == {
+            "start": "05:00",
+            "start_phrase": "Goedemorgen",
+            "end": "45:00",
+            "end_phrase": "amen",
+        }
         assert "completed_at" in payload
 
     def test_writes_nulls_when_notes_empty(self):
