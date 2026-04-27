@@ -11,6 +11,32 @@ The Station currently matches file names formats for the following audio console
 - Behringer X32, Midas M32, Behringer Wing: `R_YYYYMMDD-HHMMSS.wav`
 - Allen & Heath CQ: `AHCQ/USBREC/CQ-ST001.WAV`
 
+## How it works
+
+```mermaid
+flowchart TD
+    USB([USB drive]) -->|.wav| Pi["Upload station (Raspberry Pi)"]
+    Pi -->|.wav| Source[("Source bucket")]
+
+    Source -->|.wav| Normalize[Normalize loudness, trim<br> silence, convert to MP3]
+    Normalize -->|.mp3| Public[("Destination bucket")]
+
+    Public -->|.mp3| Notes[Generate show notes]
+    Notes -->|.json| Public
+
+    Public -->|.mp3, .json| Listing[Regenerate listing]
+    Listing -->|index.html| Public
+```
+
+Every stage reads from a bucket and writes back to a bucket, so any stage can fail, be retried, or be swapped out without affecting the others.
+
+1. **Upload station:** A service on the Raspberry Pi watches for USB drives and uploads any new recordings (matching the file-name formats above) to the source bucket.
+2. **Normalize:** A Cloud Run service downloads the WAV, normalizes loudness, trims long silences, encodes to MP3, and writes the result to the destination bucket.
+3. **Generate show notes:** Another Cloud Run step sends the MP3 to Gemini, which returns a suggested title, description, and start/end cut. The result is saved as a JSON sidecar next to the MP3.
+4. **Regenerate listing:** Whenever a new MP3 or JSON appears, the listing page is rebuilt.
+
+The destination bucket is served directly over HTTPS as static HTML, so the listing works without any application server.
+
 ## Deployment
 
 The Station consists of two parts: the physical upload station and the cloud services that process the recordings.
